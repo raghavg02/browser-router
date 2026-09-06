@@ -19,6 +19,15 @@ interface ChromiumProfileInfo {
   user_name?: string;
 }
 
+function logDebug(msg: string) {
+  try {
+    const logFile = "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\detect-debug.log";
+    fs.appendFileSync(logFile, `${new Date().toISOString()} ${msg}\n`, "utf8");
+  } catch {
+    // Ignore logging failures
+  }
+}
+
 function findLogoInAppDir(exePath: string): string | undefined {
   if (!exePath || !fs.existsSync(exePath)) return undefined;
   const appDir = path.dirname(exePath);
@@ -136,8 +145,26 @@ function cleanProfileName(rawName: string, info: ChromiumProfileInfo, dirName: s
 }
 
 export async function detectAllProfiles(): Promise<BrowserProfile[]> {
-  const localAppData = process.env.LOCALAPPDATA || "";
-  const appData = process.env.APPDATA || "";
+  logDebug("Starting detectAllProfiles...");
+
+  // Primary and fallback roots for AppData
+  const possibleLocalAppDatas = [
+    process.env.LOCALAPPDATA,
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "",
+    "C:\\Users\\ragha\\AppData\\Local",
+  ].filter(Boolean) as string[];
+
+  const possibleAppDatas = [
+    process.env.APPDATA,
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Roaming") : "",
+    "C:\\Users\\ragha\\AppData\\Roaming",
+  ].filter(Boolean) as string[];
+
+  const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Local";
+  const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Roaming";
+
+  logDebug(`Resolved localAppData=${localAppData}`);
+
   const programFiles = process.env.ProgramFiles || "C:\\Program Files";
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
 
@@ -218,18 +245,27 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
 
   for (const config of chromiumConfigs) {
     const exe = findExe(config.exeCandidates);
-    if (!exe) continue;
+    if (!exe) {
+      logDebug(`Exe not found for ${config.name}`);
+      continue;
+    }
 
     const logoIcon = findLogoInAppDir(exe);
     const localStatePath = path.join(config.userDir, "Local State");
 
     const detectedForBrowser: BrowserProfile[] = [];
+    const localStateExists = fs.existsSync(localStatePath);
 
-    if (fs.existsSync(localStatePath)) {
+    logDebug(`Browser ${config.name}: localState=${localStatePath} exists=${localStateExists}`);
+
+    if (localStateExists) {
       try {
         const rawJson = fs.readFileSync(localStatePath, "utf8");
         const parsed = JSON.parse(rawJson);
         const infoCache = (parsed?.profile?.info_cache || {}) as Record<string, ChromiumProfileInfo>;
+
+        const keys = Object.keys(infoCache);
+        logDebug(`  ${config.name} found ${keys.length} profile entries in info_cache: ${keys.join(", ")}`);
 
         for (const [profileDir, info] of Object.entries(infoCache)) {
           const profilePath = path.join(config.userDir, profileDir);
@@ -266,8 +302,9 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             email: info.user_name || undefined,
           });
         }
-      } catch (err) {
-        console.error(`Failed to read Local State for ${config.name}:`, err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logDebug(`  Error reading ${config.name}: ${msg}`);
       }
     }
 
@@ -332,7 +369,7 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             });
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Failed to parse Firefox profiles.ini:", err);
       }
     }
@@ -379,5 +416,6 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
     p.isFavorite = favIds.includes(p.id);
   }
 
+  logDebug(`Finished detectAllProfiles: found ${profiles.length} profiles total`);
   return profiles;
 }
