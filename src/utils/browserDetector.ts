@@ -19,15 +19,6 @@ interface ChromiumProfileInfo {
   user_name?: string;
 }
 
-function logDebug(msg: string) {
-  try {
-    const logFile = "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\detect-debug.log";
-    fs.appendFileSync(logFile, `${new Date().toISOString()} ${msg}\n`, "utf8");
-  } catch {
-    // Ignore logging failures
-  }
-}
-
 function findLogoInAppDir(exePath: string): string | undefined {
   if (!exePath || !fs.existsSync(exePath)) return undefined;
   const appDir = path.dirname(exePath);
@@ -58,6 +49,31 @@ function findLogoInAppDir(exePath: string): string | undefined {
         return c;
       }
     }
+  }
+  return undefined;
+}
+
+function getExtractedAssetIcon(browserId: string, exePath?: string): string | undefined {
+  try {
+    const extractedDir = path.join(__dirname, "..", "..", "assets", "extracted");
+    const extractedFile = path.join(extractedDir, `${browserId}.png`);
+
+    if (fs.existsSync(extractedFile)) {
+      return `extracted/${browserId}.png`;
+    }
+
+    if (exePath && fs.existsSync(exePath)) {
+      const diskLogo = findLogoInAppDir(exePath);
+      if (diskLogo && fs.existsSync(diskLogo)) {
+        if (!fs.existsSync(extractedDir)) {
+          fs.mkdirSync(extractedDir, { recursive: true });
+        }
+        fs.copyFileSync(diskLogo, extractedFile);
+        return `extracted/${browserId}.png`;
+      }
+    }
+  } catch {
+    // Ignore extraction errors
   }
   return undefined;
 }
@@ -120,34 +136,7 @@ function getBrowsersFromRegistry(): Map<string, string> {
   return map;
 }
 
-function cleanProfileName(rawName: string, info: ChromiumProfileInfo, dirName: string): string {
-  let name = (rawName || "").trim();
-
-  // If generic Person 1 or Default, check if signed in Google / MS account name exists
-  if (!name || name === "Person 1" || name === "Default") {
-    if (info.gaia_given_name && info.gaia_given_name.trim()) {
-      name = info.gaia_given_name.trim();
-    } else if (info.gaia_name && info.gaia_name.trim()) {
-      name = info.gaia_name.trim();
-    } else {
-      name = "Default";
-    }
-  }
-
-  // Friendly names for college domains and common typo fixes
-  if (name.toLowerCase().includes("rkgit.edu.in") || name.toLowerCase() === "rkgit") {
-    name = "College";
-  } else if (name.toLowerCase() === "bussiness") {
-    name = "Business";
-  }
-
-  return name || dirName;
-}
-
 export async function detectAllProfiles(): Promise<BrowserProfile[]> {
-  logDebug("Starting detectAllProfiles...");
-
-  // Primary and fallback roots for AppData
   const possibleLocalAppDatas = [
     process.env.LOCALAPPDATA,
     process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "",
@@ -162,8 +151,6 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
 
   const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Local";
   const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Roaming";
-
-  logDebug(`Resolved localAppData=${localAppData}`);
 
   const programFiles = process.env.ProgramFiles || "C:\\Program Files";
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
@@ -245,27 +232,19 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
 
   for (const config of chromiumConfigs) {
     const exe = findExe(config.exeCandidates);
-    if (!exe) {
-      logDebug(`Exe not found for ${config.name}`);
-      continue;
-    }
+    if (!exe) continue;
 
-    const logoIcon = findLogoInAppDir(exe);
+    const extractedIcon = getExtractedAssetIcon(config.id, exe);
+    const logoIcon = extractedIcon || findLogoInAppDir(exe);
     const localStatePath = path.join(config.userDir, "Local State");
 
     const detectedForBrowser: BrowserProfile[] = [];
-    const localStateExists = fs.existsSync(localStatePath);
 
-    logDebug(`Browser ${config.name}: localState=${localStatePath} exists=${localStateExists}`);
-
-    if (localStateExists) {
+    if (fs.existsSync(localStatePath)) {
       try {
         const rawJson = fs.readFileSync(localStatePath, "utf8");
         const parsed = JSON.parse(rawJson);
         const infoCache = (parsed?.profile?.info_cache || {}) as Record<string, ChromiumProfileInfo>;
-
-        const keys = Object.keys(infoCache);
-        logDebug(`  ${config.name} found ${keys.length} profile entries in info_cache: ${keys.join(", ")}`);
 
         for (const [profileDir, info] of Object.entries(infoCache)) {
           const profilePath = path.join(config.userDir, profileDir);
@@ -283,8 +262,7 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             }
           }
 
-          const rawName = info.name || info.gaia_given_name || info.gaia_name || profileDir;
-          const profileName = cleanProfileName(rawName, info, profileDir);
+          const rawName = info.name || profileDir;
           const profileId = `${config.id}_${profileDir}`;
           const customName = nicknames[profileId];
 
@@ -292,8 +270,8 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             id: profileId,
             browserId: config.id,
             browserName: config.name,
-            profileName,
-            displayName: customName || `${config.name} — ${profileName}`,
+            profileName: rawName,
+            displayName: customName || `${config.name} — ${rawName}`,
             profileDirectory: profileDir,
             executablePath: exe,
             iconPath: logoIcon,
@@ -303,8 +281,7 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
           });
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logDebug(`  Error reading ${config.name}: ${msg}`);
+        console.error(`Failed to read Local State for ${config.name}:`, err);
       }
     }
 
@@ -337,7 +314,7 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   );
 
   if (firefoxExe) {
-    const ffLogo = findLogoInAppDir(firefoxExe);
+    const ffLogo = getExtractedAssetIcon("firefox", firefoxExe) || findLogoInAppDir(firefoxExe);
     const iniPath = path.join(appData, "Mozilla", "Firefox", "profiles.ini");
     let ffProfilesFound = 0;
 
@@ -394,7 +371,8 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   // Merge Custom Profiles
   const customProfiles = await getCustomProfiles();
   for (const cp of customProfiles) {
-    const logoIcon = findLogoInAppDir(cp.executablePath);
+    const logoIcon =
+      getExtractedAssetIcon(cp.browserId || "custom", cp.executablePath) || findLogoInAppDir(cp.executablePath);
     const customName = nicknames[cp.id];
     profiles.push({
       id: cp.id,
@@ -416,6 +394,5 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
     p.isFavorite = favIds.includes(p.id);
   }
 
-  logDebug(`Finished detectAllProfiles: found ${profiles.length} profiles total`);
   return profiles;
 }

@@ -6,7 +6,6 @@ import {
   List,
   LaunchProps,
   getPreferenceValues,
-  Color,
   showToast,
   Toast,
   Keyboard,
@@ -15,7 +14,7 @@ import {
 import { useEffect, useState, useMemo } from "react";
 import { BrowserProfile, ExtensionPreferences } from "./types";
 import { detectAllProfiles } from "./utils/browserDetector";
-import { buildTargetUrl, isLikelyUrl } from "./utils/urlHelper";
+import { buildTargetUrl } from "./utils/urlHelper";
 import { launchBrowserProfile } from "./utils/launcher";
 import { toggleFavorite, removeCustomProfile } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
@@ -62,8 +61,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return buildTargetUrl(effectiveQuery, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
   }, [effectiveQuery, preferences.defaultSearchEngine, preferences.customSearchUrl]);
 
-  async function handleLaunch(profile: BrowserProfile) {
-    await launchBrowserProfile(profile, targetUrl || undefined);
+  async function handleLaunch(profile: BrowserProfile, incognito = false) {
+    await launchBrowserProfile(profile, targetUrl || undefined, incognito);
   }
 
   async function handleToggleFavorite(profileId: string) {
@@ -88,61 +87,28 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const allOther = useMemo(() => profiles.filter((p) => !p.isFavorite), [profiles]);
 
   function getProfileIcon(profile: BrowserProfile): Image.ImageLike {
-    if (profile.avatarPath) {
-      return { source: profile.avatarPath, mask: Image.Mask.Circle };
-    }
     if (profile.iconPath) {
       return { source: profile.iconPath };
+    }
+    if (profile.avatarPath) {
+      return { source: profile.avatarPath, mask: Image.Mask.Circle };
     }
     return { source: profile.fallbackIcon };
   }
 
-  function getSubtitle(profile: BrowserProfile): string {
-    if (effectiveQuery.trim()) {
-      if (isLikelyUrl(effectiveQuery)) {
-        return `Open ${effectiveQuery}`;
-      }
-      return `Search: "${effectiveQuery}"`;
-    }
-    return profile.email || "Open new tab";
-  }
-
   function renderProfileItem(profile: BrowserProfile) {
     const icon = getProfileIcon(profile);
-    const subtitle = getSubtitle(profile);
-
-    const accessories: List.Item.Accessory[] = [];
-
-    if (profile.isFavorite) {
-      accessories.push({
-        icon: { source: Icon.Star, tintColor: Color.Yellow },
-        tooltip: "Favorite Profile",
-      });
-    }
-
-    if (profile.email) {
-      accessories.push({
-        text: profile.email,
-        tooltip: `Account: ${profile.email}`,
-      });
-    } else if (profile.profileDirectory && profile.profileDirectory !== "Default") {
-      accessories.push({
-        tag: { value: profile.profileDirectory, color: Color.SecondaryText },
-      });
-    }
-
-    if (profile.isCustom) {
-      accessories.push({
-        tag: { value: "Custom", color: Color.Blue },
-      });
-    }
+    const accessories: List.Item.Accessory[] = [
+      {
+        text: `Profile: ${profile.profileDirectory}`,
+      },
+    ];
 
     return (
       <List.Item
         key={profile.id}
         icon={icon}
         title={profile.displayName}
-        subtitle={subtitle}
         accessories={accessories}
         actions={
           <ActionPanel>
@@ -150,13 +116,13 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               <Action
                 title={`Open in ${profile.displayName}`}
                 icon={Icon.Globe}
-                onAction={() => handleLaunch(profile)}
+                onAction={() => handleLaunch(profile, false)}
               />
               <Action
-                title={profile.isFavorite ? "Remove from Favorites" : "Mark as Favorite"}
-                icon={Icon.Star}
-                shortcut={{ modifiers: ["ctrl"], key: "f" }}
-                onAction={() => handleToggleFavorite(profile.id)}
+                title="Open in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => handleLaunch(profile, true)}
               />
             </ActionPanel.Section>
 
@@ -180,6 +146,12 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
             </ActionPanel.Section>
 
             <ActionPanel.Section title="Customize Profile">
+              <Action
+                title={profile.isFavorite ? "Remove from Favorites" : "Mark as Favorite"}
+                icon={Icon.Star}
+                shortcut={{ modifiers: ["ctrl"], key: "f" }}
+                onAction={() => handleToggleFavorite(profile.id)}
+              />
               <Action.Push
                 title="Rename Display Name…"
                 icon={Icon.Pencil}
@@ -225,12 +197,16 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   const isFilterMode = Boolean(lockedQuery);
 
+  const placeholderText = effectiveQuery.trim()
+    ? `Routing "${effectiveQuery}" — Select browser or profile...`
+    : "Select browser or profile...";
+
+  const sectionTitle = targetUrl ? `Destination: ${targetUrl}` : "Browsers & Profiles";
+
   return (
     <List
       isLoading={isLoading}
-      searchBarPlaceholder={
-        isFilterMode ? `Filter profiles (Query: "${lockedQuery}")` : "Type URL or search query, then select a profile…"
-      }
+      searchBarPlaceholder={placeholderText}
       filtering={isFilterMode}
       searchText={isFilterMode ? undefined : liveQuery}
       onSearchTextChange={isFilterMode ? undefined : setLiveQuery}
@@ -253,9 +229,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
       {favorites.length > 0 ? <List.Section title="Favorites">{favorites.map(renderProfileItem)}</List.Section> : null}
 
-      <List.Section title={favorites.length > 0 ? "All Browsers & Profiles" : "Browsers & Profiles"}>
-        {allOther.map(renderProfileItem)}
-      </List.Section>
+      <List.Section title={sectionTitle}>{allOther.map(renderProfileItem)}</List.Section>
 
       <List.Section title="Manage">
         <List.Item

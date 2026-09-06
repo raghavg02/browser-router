@@ -2,17 +2,31 @@ import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
 
-export async function launchBrowserProfile(profile: BrowserProfile, targetUrl?: string): Promise<boolean> {
+export async function launchBrowserProfile(
+  profile: BrowserProfile,
+  targetUrl?: string,
+  incognito = false,
+): Promise<boolean> {
   try {
     const args: string[] = [];
 
     if (profile.browserId === "firefox") {
+      if (incognito) {
+        args.push("-private-window");
+      }
       args.push("-P", profile.profileDirectory);
       if (targetUrl) {
         args.push(targetUrl);
       }
     } else {
       // Chromium browsers (Chrome, Edge, Brave, Vivaldi, Arc, Opera, etc.)
+      if (incognito) {
+        if (profile.browserId === "edge") {
+          args.push("--inprivate");
+        } else {
+          args.push("--incognito");
+        }
+      }
       if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
         args.push(`--profile-directory=${profile.profileDirectory}`);
       }
@@ -29,9 +43,10 @@ export async function launchBrowserProfile(profile: BrowserProfile, targetUrl?: 
 
     child.unref();
 
+    const modeText = incognito ? " (Incognito)" : "";
     await showToast({
       style: Toast.Style.Success,
-      title: `Opened in ${profile.displayName}`,
+      title: `Opened in ${profile.displayName}${modeText}`,
       message: targetUrl ? (targetUrl.length > 50 ? targetUrl.substring(0, 47) + "…" : targetUrl) : undefined,
     });
 
