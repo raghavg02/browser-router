@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
 import { BrowserProfile } from "../types";
-import { getCustomProfiles, getFavoriteIds } from "./storage";
+import { getCustomProfiles, getFavoriteIds, getProfileNicknames } from "./storage";
 
 interface ChromiumBrowserDef {
   id: string;
@@ -111,6 +111,30 @@ function getBrowsersFromRegistry(): Map<string, string> {
   return map;
 }
 
+function cleanProfileName(rawName: string, info: ChromiumProfileInfo, dirName: string): string {
+  let name = (rawName || "").trim();
+
+  // If generic Person 1 or Default, check if signed in Google / MS account name exists
+  if (!name || name === "Person 1" || name === "Default") {
+    if (info.gaia_given_name && info.gaia_given_name.trim()) {
+      name = info.gaia_given_name.trim();
+    } else if (info.gaia_name && info.gaia_name.trim()) {
+      name = info.gaia_name.trim();
+    } else {
+      name = "Default";
+    }
+  }
+
+  // Friendly names for college domains and common typo fixes
+  if (name.toLowerCase().includes("rkgit.edu.in") || name.toLowerCase() === "rkgit") {
+    name = "College";
+  } else if (name.toLowerCase() === "bussiness") {
+    name = "Business";
+  }
+
+  return name || dirName;
+}
+
 export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   const localAppData = process.env.LOCALAPPDATA || "";
   const appData = process.env.APPDATA || "";
@@ -118,6 +142,7 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
 
   const registryBrowsers = getBrowsersFromRegistry();
+  const nicknames = await getProfileNicknames();
   const profiles: BrowserProfile[] = [];
 
   const chromiumConfigs: ChromiumBrowserDef[] = [
@@ -222,18 +247,17 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             }
           }
 
-          let rawName = info.name || info.gaia_given_name || info.gaia_name || profileDir;
-          if (rawName === "Default" || rawName === "Person 1") {
-            if (info.gaia_given_name) rawName = info.gaia_given_name;
-            else if (info.gaia_name) rawName = info.gaia_name;
-          }
+          const rawName = info.name || info.gaia_given_name || info.gaia_name || profileDir;
+          const profileName = cleanProfileName(rawName, info, profileDir);
+          const profileId = `${config.id}_${profileDir}`;
+          const customName = nicknames[profileId];
 
           detectedForBrowser.push({
-            id: `${config.id}_${profileDir}`,
+            id: profileId,
             browserId: config.id,
             browserName: config.name,
-            profileName: rawName,
-            displayName: `${config.name} — ${rawName}`,
+            profileName,
+            displayName: customName || `${config.name} — ${profileName}`,
             profileDirectory: profileDir,
             executablePath: exe,
             iconPath: logoIcon,
@@ -248,22 +272,19 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
     }
 
     if (detectedForBrowser.length === 0) {
+      const profileId = `${config.id}_Default`;
+      const customName = nicknames[profileId];
       detectedForBrowser.push({
-        id: `${config.id}_Default`,
+        id: profileId,
         browserId: config.id,
         browserName: config.name,
         profileName: "Default",
-        displayName: config.name,
+        displayName: customName || `${config.name} — Default`,
         profileDirectory: "Default",
         executablePath: exe,
         iconPath: logoIcon,
         fallbackIcon: config.fallbackIcon,
       });
-    } else if (
-      detectedForBrowser.length === 1 &&
-      (detectedForBrowser[0].profileName === "Default" || detectedForBrowser[0].profileName === "Person 1")
-    ) {
-      detectedForBrowser[0].displayName = config.name;
     }
 
     profiles.push(...detectedForBrowser);
@@ -295,12 +316,15 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             const profileName = nameMatch[1].trim();
             const profilePath = pathMatch ? pathMatch[1].trim() : profileName;
             ffProfilesFound++;
+            const profileId = `firefox_${profileName}`;
+            const customName = nicknames[profileId];
+
             profiles.push({
-              id: `firefox_${profileName}`,
+              id: profileId,
               browserId: "firefox",
               browserName: "Firefox",
               profileName,
-              displayName: `Firefox — ${profileName}`,
+              displayName: customName || `Firefox — ${profileName}`,
               profileDirectory: profilePath,
               executablePath: firefoxExe,
               iconPath: ffLogo,
@@ -314,12 +338,14 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
     }
 
     if (ffProfilesFound === 0) {
+      const profileId = "firefox_default";
+      const customName = nicknames[profileId];
       profiles.push({
-        id: "firefox_default",
+        id: profileId,
         browserId: "firefox",
         browserName: "Firefox",
-        profileName: "default",
-        displayName: "Firefox",
+        profileName: "Default",
+        displayName: customName || "Firefox — Default",
         profileDirectory: "default",
         executablePath: firefoxExe,
         iconPath: ffLogo,
@@ -332,12 +358,13 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   const customProfiles = await getCustomProfiles();
   for (const cp of customProfiles) {
     const logoIcon = findLogoInAppDir(cp.executablePath);
+    const customName = nicknames[cp.id];
     profiles.push({
       id: cp.id,
       browserId: cp.browserId || "custom",
       browserName: cp.browserName,
       profileName: cp.profileName,
-      displayName: `${cp.browserName} — ${cp.profileName}`,
+      displayName: customName || `${cp.browserName} — ${cp.profileName}`,
       profileDirectory: cp.profileDirectory,
       executablePath: cp.executablePath,
       iconPath: logoIcon,

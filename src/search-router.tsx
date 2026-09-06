@@ -19,6 +19,7 @@ import { buildTargetUrl, isLikelyUrl } from "./utils/urlHelper";
 import { launchBrowserProfile } from "./utils/launcher";
 import { toggleFavorite, removeCustomProfile } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
+import { RenameProfileForm } from "./components/RenameProfileForm";
 
 export default function Command(props: LaunchProps<{ arguments: { query?: string }; fallbackText?: string }>) {
   const preferences = getPreferenceValues<ExtensionPreferences>();
@@ -178,7 +179,13 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               ) : null}
             </ActionPanel.Section>
 
-            <ActionPanel.Section title="Custom Profiles">
+            <ActionPanel.Section title="Customize Profile">
+              <Action.Push
+                title="Rename Display Name…"
+                icon={Icon.Pencil}
+                shortcut={Keyboard.Shortcut.Common.Edit}
+                target={<RenameProfileForm profile={profile} onRenamed={loadProfiles} />}
+              />
               <Action.Push
                 title="Add Custom Profile…"
                 icon={Icon.Plus}

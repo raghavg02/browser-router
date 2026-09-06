@@ -3,6 +3,7 @@ import { CustomProfileData } from "../types";
 
 const CUSTOM_PROFILES_KEY = "custom_browser_profiles";
 const FAVORITES_KEY = "favorite_profile_ids";
+const PROFILE_NICKNAMES_KEY = "profile_custom_nicknames";
 
 export async function getCustomProfiles(): Promise<CustomProfileData[]> {
   const data = await LocalStorage.getItem<string>(CUSTOM_PROFILES_KEY);
@@ -50,4 +51,24 @@ export async function toggleFavorite(profileId: string): Promise<boolean> {
   }
   await LocalStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   return isFav;
+}
+
+export async function getProfileNicknames(): Promise<Record<string, string>> {
+  const data = await LocalStorage.getItem<string>(PROFILE_NICKNAMES_KEY);
+  if (!data) return {};
+  try {
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+export async function setProfileNickname(profileId: string, nickname: string): Promise<void> {
+  const nicknames = await getProfileNicknames();
+  if (!nickname.trim()) {
+    delete nicknames[profileId];
+  } else {
+    nicknames[profileId] = nickname.trim();
+  }
+  await LocalStorage.setItem(PROFILE_NICKNAMES_KEY, JSON.stringify(nicknames));
 }
