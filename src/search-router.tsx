@@ -151,7 +151,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               <Action
                 title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
                 icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
-                shortcut={{ modifiers: ["ctrl"], key: "tab" }}
+                shortcut={{ modifiers: [], key: "tab" }}
                 onAction={toggleMode}
               />
               {searchQuery ? (
@@ -221,14 +221,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     );
   }
 
-  const placeholderText =
-    mode === "query"
-      ? searchQuery.trim()
-        ? `Routing "${searchQuery}" — [Tab / Ctrl+Tab to filter]`
-        : "Type search query or URL... [Tab / Ctrl+Tab to filter]"
-      : searchQuery.trim()
-        ? `Filter profiles for "${searchQuery}"... [Tab / Ctrl+Tab to search]`
-        : "Filter profiles by name or browser... [Tab / Ctrl+Tab to search]";
+  const placeholderText = mode === "query" ? "Search query or URL..." : "Filter profiles...";
 
   const sectionTitle =
     mode === "query"
@@ -247,13 +240,9 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       searchText={mode === "query" ? searchQuery : filterText}
       onSearchTextChange={mode === "query" ? setSearchQuery : setFilterText}
       searchBarAccessory={
-        <List.Dropdown
-          tooltip="Toggle Mode (Press Tab or Ctrl+Tab)"
-          value={mode}
-          onChange={(val) => setMode(val as "query" | "filter")}
-        >
-          <List.Dropdown.Item value="query" title="🔍 Search Query" />
-          <List.Dropdown.Item value="filter" title="🎯 Filter Profiles" />
+        <List.Dropdown tooltip="Mode" value={mode} onChange={(val) => setMode(val as "query" | "filter")}>
+          <List.Dropdown.Item value="query" title="Search" icon={Icon.MagnifyingGlass} />
+          <List.Dropdown.Item value="filter" title="Filter" icon={Icon.Filter} />
         </List.Dropdown>
       }
     >
@@ -262,7 +251,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         title="No Matching Profiles"
         description={
           mode === "filter"
-            ? `No profile matches "${filterText}". Press Tab or Ctrl+Tab to return to query search.`
+            ? `No profile matches "${filterText}". Press Tab to return to search query.`
             : "No browser profiles detected. Add a custom profile below."
         }
         actions={
@@ -270,7 +259,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
             <Action
               title="Switch to Search Query Mode"
               icon={Icon.MagnifyingGlass}
-              shortcut={{ modifiers: ["ctrl"], key: "tab" }}
+              shortcut={{ modifiers: [], key: "tab" }}
               onAction={() => setMode("query")}
             />
             <Action.Push
