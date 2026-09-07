@@ -175,38 +175,45 @@ function blendPixel(dst: Buffer, dIdx: number, r: number, g: number, b: number, 
   dst[dIdx + 3] = Math.round(outA * 255);
 }
 
-function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Buffer): Buffer {
+function compositeAvatarMainWithBrowserBadge(avatarPngBuf: Buffer, browserPngBuf: Buffer): Buffer {
   const canvas = Buffer.alloc(256 * 256 * 4);
 
-  // 1. Draw Main Browser Logo (244x244 placed at x:2, y:10 - UNCHANGED)
-  const browserLogo = decodePng(browserPngBuf);
-  const mainSize = 244;
-  const mainX = 2;
-  const mainY = 10;
-  const scaledBrowser = resizeRgba(browserLogo.pixels, browserLogo.w, browserLogo.h, mainSize, mainSize);
+  // 1. Draw Profile Avatar as the MAIN HERO ICON (Circular, diameter 224px, centered at 120, 136)
+  const av = decodePng(avatarPngBuf);
+  const mainCx = 120;
+  const mainCy = 136;
+  const mainRadius = 112;
+  const avDrawSize = mainRadius * 2;
+  const scaledAv = resizeRgba(av.pixels, av.w, av.h, avDrawSize, avDrawSize);
+  const avStartX = mainCx - mainRadius;
+  const avStartY = mainCy - mainRadius;
 
-  for (let by = 0; by < mainSize; by++) {
-    const targetY = mainY + by;
+  for (let ay = 0; ay < avDrawSize; ay++) {
+    const targetY = avStartY + ay;
     if (targetY < 0 || targetY >= 256) continue;
-    for (let bx = 0; bx < mainSize; bx++) {
-      const targetX = mainX + bx;
+    for (let ax = 0; ax < avDrawSize; ax++) {
+      const targetX = avStartX + ax;
       if (targetX < 0 || targetX >= 256) continue;
-      const sIdx = (by * mainSize + bx) * 4;
+      const distCenter = Math.hypot(ax - mainRadius, ay - mainRadius);
+      if (distCenter > mainRadius) continue;
+      const aa = Math.min(1, Math.max(0, mainRadius - distCenter + 0.5));
+
+      const sIdx = (ay * avDrawSize + ax) * 4;
       const dIdx = (targetY * 256 + targetX) * 4;
-      const a = scaledBrowser[sIdx + 3];
+      const a = Math.round(scaledAv[sIdx + 3] * aa);
       if (a > 0) {
-        blendPixel(canvas, dIdx, scaledBrowser[sIdx], scaledBrowser[sIdx + 1], scaledBrowser[sIdx + 2], a);
+        blendPixel(canvas, dIdx, scaledAv[sIdx], scaledAv[sIdx + 1], scaledAv[sIdx + 2], a);
       }
     }
   }
 
-  // 2. Draw Avatar as Notification Badge at TOP-RIGHT: Increased to 140px diameter (avatarRadius 70px, badgeRadius 76px at 178, 78)
-  const badgeCx = 178;
-  const badgeCy = 78;
-  const badgeRadius = 76;
-  const avatarRadius = 70;
+  // 2. Draw Browser Logo as NOTIFICATION BADGE at TOP-RIGHT
+  const badgeCx = 192;
+  const badgeCy = 64;
+  const badgeRadius = 56; // Outer white circular backing & ring
+  const logoRadius = 48; // Inner browser logo radius (diameter 96px)
 
-  // Elevation drop shadow under the badge
+  // Soft elevation drop shadow under the badge
   for (let y = 0; y < 256; y++) {
     for (let x = 0; x < 256; x++) {
       const distShadow = Math.hypot(x - badgeCx, y - 4 - badgeCy);
@@ -218,7 +225,7 @@ function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Bu
     }
   }
 
-  // Crisp white outer border ring (6px ring)
+  // Crisp white outer circular badge backing & ring
   for (let y = 0; y < 256; y++) {
     for (let x = 0; x < 256; x++) {
       const dist = Math.hypot(x - badgeCx, y - badgeCy);
@@ -234,28 +241,28 @@ function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Bu
     }
   }
 
-  // Draw circular cropped avatar inside the badge (diameter 140px)
-  const av = decodePng(avatarPngBuf);
-  const avDrawSize = avatarRadius * 2;
-  const scaledAv = resizeRgba(av.pixels, av.w, av.h, avDrawSize, avDrawSize);
-  const avStartX = badgeCx - avatarRadius;
-  const avStartY = badgeCy - avatarRadius;
+  // Draw Browser Logo inside the badge (crisp 96x96 browser logo)
+  const browserLogo = decodePng(browserPngBuf);
+  const logoDrawSize = logoRadius * 2;
+  const scaledLogo = resizeRgba(browserLogo.pixels, browserLogo.w, browserLogo.h, logoDrawSize, logoDrawSize);
+  const logoStartX = badgeCx - logoRadius;
+  const logoStartY = badgeCy - logoRadius;
 
-  for (let ay = 0; ay < avDrawSize; ay++) {
-    const targetY = avStartY + ay;
+  for (let ly = 0; ly < logoDrawSize; ly++) {
+    const targetY = logoStartY + ly;
     if (targetY < 0 || targetY >= 256) continue;
-    for (let ax = 0; ax < avDrawSize; ax++) {
-      const targetX = avStartX + ax;
+    for (let lx = 0; lx < logoDrawSize; lx++) {
+      const targetX = logoStartX + lx;
       if (targetX < 0 || targetX >= 256) continue;
-      const distCenter = Math.hypot(ax - avatarRadius, ay - avatarRadius);
-      if (distCenter > avatarRadius) continue;
-      const aa = Math.min(1, Math.max(0, avatarRadius - distCenter + 0.5));
+      const distCenter = Math.hypot(lx - logoRadius, ly - logoRadius);
+      if (distCenter > logoRadius) continue;
+      const aa = Math.min(1, Math.max(0, logoRadius - distCenter + 0.5));
 
-      const sIdx = (ay * avDrawSize + ax) * 4;
+      const sIdx = (ly * logoDrawSize + lx) * 4;
       const dIdx = (targetY * 256 + targetX) * 4;
-      const a = Math.round(scaledAv[sIdx + 3] * aa);
+      const a = Math.round(scaledLogo[sIdx + 3] * aa);
       if (a > 0) {
-        blendPixel(canvas, dIdx, scaledAv[sIdx], scaledAv[sIdx + 1], scaledAv[sIdx + 2], a);
+        blendPixel(canvas, dIdx, scaledLogo[sIdx], scaledLogo[sIdx + 1], scaledLogo[sIdx + 2], a);
       }
     }
   }
@@ -294,13 +301,13 @@ export function ensureAvatarBadgedIcon(
       fs.mkdirSync(profilesDir, { recursive: true });
     }
 
-    const badgedFile = path.join(profilesDir, `v5_badge_${safeProfileId}.png`);
+    const badgedFile = path.join(profilesDir, `v6_badge_${safeProfileId}.png`);
     const avatarStat = fs.statSync(diskAvatarPath);
 
     if (fs.existsSync(badgedFile)) {
       const badgedStat = fs.statSync(badgedFile);
       if (badgedStat.mtimeMs >= avatarStat.mtimeMs) {
-        return `profiles/v5_badge_${safeProfileId}.png`;
+        return `profiles/v6_badge_${safeProfileId}.png`;
       }
     }
 
@@ -312,15 +319,16 @@ export function ensureAvatarBadgedIcon(
 
     const browserLogoBuf = fs.readFileSync(browserLogoPath);
     const avatarBuf = fs.readFileSync(diskAvatarPath);
-    const composited = compositeBrowserWithAvatarBadge(browserLogoBuf, avatarBuf);
+    const composited = compositeAvatarMainWithBrowserBadge(avatarBuf, browserLogoBuf);
 
     fs.writeFileSync(badgedFile, composited);
+    fs.writeFileSync(path.join(profilesDir, `v5_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `v4_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `v3_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `v2_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `${safeProfileId}.png`), composited);
 
-    return `profiles/v5_badge_${safeProfileId}.png`;
+    return `profiles/v6_badge_${safeProfileId}.png`;
   } catch (err) {
     console.error(`Failed to generate badged icon for ${safeProfileId}:`, err);
     return undefined;
