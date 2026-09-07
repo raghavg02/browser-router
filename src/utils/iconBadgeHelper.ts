@@ -268,11 +268,14 @@ export function getAssetsDir(): string {
     path.join(__dirname, "assets"),
     path.join(__dirname, "..", "assets"),
     path.join(__dirname, "..", "..", "assets"),
+    "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\assets",
+    "C:\\Users\\ragha\\.config\\raycast-x\\extensions\\search-router\\assets",
+    "C:\\Users\\ragha\\AppData\\Local\\Raycast\\extensions\\search-router\\assets",
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  return path.join(__dirname, "assets");
+  return "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\assets";
 }
 
 export function ensureAvatarBadgedIcon(
