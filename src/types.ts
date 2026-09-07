@@ -17,7 +17,6 @@ export interface BrowserProfile {
 export interface ExtensionPreferences {
   defaultSearchEngine: "google" | "duckduckgo" | "bing" | "brave" | "perplexity" | "ecosia" | "custom";
   customSearchUrl?: string;
-  customBrowserPaths?: string;
 }
 
 export interface CustomProfileData {
