@@ -75,6 +75,14 @@
       "type": "textfield",
       "required": false,
       "placeholder": "https://kagi.com/search?q=%s"
+    },
+    {
+      "name": "customBrowserPaths",
+      "title": "Custom Browsers / Profiles",
+      "description": "Path to any portable browser or custom profile directory",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "e.g. D:\\Browsers\\Tor\\firefox.exe"
     }
   ],
   "dependencies": {

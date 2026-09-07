@@ -40,8 +40,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Auto-generated assets
-assets/profiles/
 
 # Private ideas & feature roadmap
 IDEAS.md

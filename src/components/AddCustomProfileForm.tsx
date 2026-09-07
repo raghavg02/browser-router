@@ -3,7 +3,7 @@ import { useState } from "react";
 import { saveCustomProfile } from "../utils/storage";
 
 interface AddCustomProfileFormProps {
-  onProfileAdded: () => void;
+  onProfileAdded?: () => void;
 }
 
 export function AddCustomProfileForm({ onProfileAdded }: AddCustomProfileFormProps) {
@@ -35,7 +35,7 @@ export function AddCustomProfileForm({ onProfileAdded }: AddCustomProfileFormPro
 
     if (hasError) return;
 
-    const id = `custom_${Date.now()}`;
+    const id = custom_;
     await saveCustomProfile({
       id,
       browserName: browserName.trim(),
@@ -47,10 +47,12 @@ export function AddCustomProfileForm({ onProfileAdded }: AddCustomProfileFormPro
     await showToast({
       style: Toast.Style.Success,
       title: "Profile Added",
-      message: `${browserName} — ${profileName || "Default"}`,
+      message: `${browserName} - ${profileName || "Default"}`,
     });
 
-    onProfileAdded();
+    if (onProfileAdded) {
+      onProfileAdded();
+    }
     pop();
   }
 

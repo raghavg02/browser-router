@@ -55,6 +55,10 @@ function findLogoInAppDir(exePath: string): string | undefined {
 
 function getExtractedAssetIcon(browserId: string, exePath?: string): string | undefined {
   try {
+    const known = ["chrome", "edge", "brave", "vivaldi"];
+    if (known.includes(browserId)) {
+      return `extracted/${browserId}.png`;
+    }
     const extractedDir = path.join(__dirname, "..", "..", "assets", "extracted");
     const extractedFile = path.join(extractedDir, `${browserId}.png`);
 
@@ -255,10 +259,16 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
             path.join(profilePath, "Edge Profile Picture.png"),
             path.join(profilePath, "Custom Profile Picture.png"),
           ];
-          for (const pic of possiblePics) {
-            if (fs.existsSync(pic)) {
-              avatarPath = pic;
-              break;
+          const safeProfileId = `${config.id}_${profileDir.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+          const badgedCandidate = path.join(__dirname, "..", "..", "assets", "profiles", `${safeProfileId}.png`);
+          if (fs.existsSync(badgedCandidate)) {
+            avatarPath = `profiles/${safeProfileId}.png`;
+          } else {
+            for (const pic of possiblePics) {
+              if (fs.existsSync(pic)) {
+                avatarPath = pic;
+                break;
+              }
             }
           }
 

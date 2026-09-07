@@ -87,11 +87,11 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const allOther = useMemo(() => profiles.filter((p) => !p.isFavorite), [profiles]);
 
   function getProfileIcon(profile: BrowserProfile): Image.ImageLike {
+    if (profile.avatarPath) {
+      return { source: profile.avatarPath };
+    }
     if (profile.iconPath) {
       return { source: profile.iconPath };
-    }
-    if (profile.avatarPath) {
-      return { source: profile.avatarPath, mask: Image.Mask.Circle };
     }
     return { source: profile.fallbackIcon };
   }
@@ -230,24 +230,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       {favorites.length > 0 ? <List.Section title="Favorites">{favorites.map(renderProfileItem)}</List.Section> : null}
 
       <List.Section title={sectionTitle}>{allOther.map(renderProfileItem)}</List.Section>
-
-      <List.Section title="Manage">
-        <List.Item
-          id="add_custom_profile_item"
-          title="Add Custom Browser / Profile Folder…"
-          subtitle="Add any unlisted browser or specific profile path"
-          icon={Icon.PlusCircle}
-          actions={
-            <ActionPanel>
-              <Action.Push
-                title="Add Custom Profile…"
-                icon={Icon.Plus}
-                target={<AddCustomProfileForm onProfileAdded={loadProfiles} />}
-              />
-            </ActionPanel>
-          }
-        />
-      </List.Section>
     </List>
   );
 }
