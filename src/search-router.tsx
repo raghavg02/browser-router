@@ -24,11 +24,14 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const preferences = getPreferenceValues<ExtensionPreferences>();
 
   // Determine if query came from Raycast argument or fallback text
-  const initialLockedQuery = (props.arguments.query || props.fallbackText || "").trim();
-  const [lockedQuery, setLockedQuery] = useState<string>(initialLockedQuery);
+  const initialQuery = (props.arguments.query || props.fallbackText || "").trim();
 
-  // For when user opens without arguments and types directly into the List
-  const [liveQuery, setLiveQuery] = useState<string>("");
+  // Mode: "query" (default, typing updates search query/URL) or "filter" (typing filters browser list)
+  const [mode, setMode] = useState<"query" | "filter">("query");
+
+  // Preserved state for both modes
+  const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
+  const [filterText, setFilterText] = useState<string>("");
 
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -54,12 +57,10 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     loadProfiles();
   }, []);
 
-  const effectiveQuery = lockedQuery || liveQuery;
-
   const targetUrl = useMemo(() => {
-    if (!effectiveQuery.trim()) return "";
-    return buildTargetUrl(effectiveQuery, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
-  }, [effectiveQuery, preferences.defaultSearchEngine, preferences.customSearchUrl]);
+    if (!searchQuery.trim()) return "";
+    return buildTargetUrl(searchQuery, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
+  }, [searchQuery, preferences.defaultSearchEngine, preferences.customSearchUrl]);
 
   async function handleLaunch(profile: BrowserProfile, incognito = false) {
     await launchBrowserProfile(profile, targetUrl || undefined, incognito);
@@ -83,8 +84,24 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     });
   }
 
-  const favorites = useMemo(() => profiles.filter((p) => p.isFavorite), [profiles]);
-  const allOther = useMemo(() => profiles.filter((p) => !p.isFavorite), [profiles]);
+  // Filter profiles when in "filter" mode, or show all when in "query" mode
+  const displayedProfiles = useMemo(() => {
+    if (mode !== "filter" || !filterText.trim()) {
+      return profiles;
+    }
+    const q = filterText.toLowerCase().trim();
+    return profiles.filter((p) => {
+      const matchDisplay = p.displayName.toLowerCase().includes(q);
+      const matchBrowser = p.browserName.toLowerCase().includes(q);
+      const matchProfile = p.profileName.toLowerCase().includes(q);
+      const matchDir = p.profileDirectory.toLowerCase().includes(q);
+      const matchEmail = p.email ? p.email.toLowerCase().includes(q) : false;
+      return matchDisplay || matchBrowser || matchProfile || matchDir || matchEmail;
+    });
+  }, [profiles, mode, filterText]);
+
+  const favorites = useMemo(() => displayedProfiles.filter((p) => p.isFavorite), [displayedProfiles]);
+  const allOther = useMemo(() => displayedProfiles.filter((p) => !p.isFavorite), [displayedProfiles]);
 
   function getProfileIcon(profile: BrowserProfile): Image.ImageLike {
     if (profile.avatarPath) {
@@ -94,6 +111,10 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       return { source: profile.iconPath };
     }
     return { source: profile.fallbackIcon };
+  }
+
+  function toggleMode() {
+    setMode((prev) => (prev === "query" ? "filter" : "query"));
   }
 
   function renderProfileItem(profile: BrowserProfile) {
@@ -126,21 +147,26 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               />
             </ActionPanel.Section>
 
-            <ActionPanel.Section title="Query & URL">
+            <ActionPanel.Section title="Search & Filter Mode">
+              <Action
+                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
+                shortcut={{ modifiers: ["ctrl"], key: "tab" }}
+                onAction={toggleMode}
+              />
+              {searchQuery ? (
+                <Action
+                  title="Clear Search Query"
+                  icon={Icon.XMarkCircle}
+                  shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
+                  onAction={() => setSearchQuery("")}
+                />
+              ) : null}
               {targetUrl ? (
                 <Action.CopyToClipboard
                   title="Copy Destination URL"
                   content={targetUrl}
                   shortcut={{ modifiers: ["ctrl"], key: "c" }}
-                />
-              ) : null}
-
-              {lockedQuery ? (
-                <Action
-                  title="Clear Query (Switch to Filter Mode)"
-                  icon={Icon.XMarkCircle}
-                  shortcut={{ modifiers: ["ctrl"], key: "x" }}
-                  onAction={() => setLockedQuery("")}
                 />
               ) : null}
             </ActionPanel.Section>
@@ -195,28 +221,58 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     );
   }
 
-  const isFilterMode = Boolean(lockedQuery);
+  const placeholderText =
+    mode === "query"
+      ? searchQuery.trim()
+        ? `Routing "${searchQuery}" — [Tab / Ctrl+Tab to filter]`
+        : "Type search query or URL... [Tab / Ctrl+Tab to filter]"
+      : searchQuery.trim()
+        ? `Filter profiles for "${searchQuery}"... [Tab / Ctrl+Tab to search]`
+        : "Filter profiles by name or browser... [Tab / Ctrl+Tab to search]";
 
-  const placeholderText = effectiveQuery.trim()
-    ? `Routing "${effectiveQuery}" — Select browser or profile...`
-    : "Select browser or profile...";
-
-  const sectionTitle = targetUrl ? `Destination: ${targetUrl}` : "Browsers & Profiles";
+  const sectionTitle =
+    mode === "query"
+      ? targetUrl
+        ? `Destination: ${targetUrl}`
+        : "Browsers & Profiles"
+      : searchQuery.trim()
+        ? `Routing query: "${searchQuery}"`
+        : "Filter Profiles";
 
   return (
     <List
       isLoading={isLoading}
       searchBarPlaceholder={placeholderText}
-      filtering={isFilterMode}
-      searchText={isFilterMode ? undefined : liveQuery}
-      onSearchTextChange={isFilterMode ? undefined : setLiveQuery}
+      filtering={false}
+      searchText={mode === "query" ? searchQuery : filterText}
+      onSearchTextChange={mode === "query" ? setSearchQuery : setFilterText}
+      searchBarAccessory={
+        <List.Dropdown
+          tooltip="Toggle Mode (Press Tab or Ctrl+Tab)"
+          value={mode}
+          onChange={(val) => setMode(val as "query" | "filter")}
+        >
+          <List.Dropdown.Item value="query" title="🔍 Search Query" />
+          <List.Dropdown.Item value="filter" title="🎯 Filter Profiles" />
+        </List.Dropdown>
+      }
     >
       <List.EmptyView
         icon={Icon.MagnifyingGlass}
         title="No Matching Profiles"
-        description="Try a different filter or add a custom profile."
+        description={
+          mode === "filter"
+            ? `No profile matches "${filterText}". Press Tab or Ctrl+Tab to return to query search.`
+            : "No browser profiles detected. Add a custom profile below."
+        }
         actions={
           <ActionPanel>
+            <Action
+              title="Switch to Search Query Mode"
+              icon={Icon.MagnifyingGlass}
+              shortcut={{ modifiers: ["ctrl"], key: "tab" }}
+              onAction={() => setMode("query")}
+            />
             <Action.Push
               title="Add Custom Profile…"
               icon={Icon.Plus}
