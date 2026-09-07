@@ -27,7 +27,12 @@ export async function launchBrowserProfile(
           args.push("--incognito");
         }
       }
-      if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
+      const shouldPassProfileDir =
+        profile.profileDirectory &&
+        profile.profileDirectory !== "default-no-arg" &&
+        !((profile.browserId === "brave" || profile.browserId === "vivaldi") && profile.profileDirectory === "Default");
+
+      if (shouldPassProfileDir) {
         args.push(`--profile-directory=${profile.profileDirectory}`);
       }
       if (targetUrl) {
@@ -38,7 +43,6 @@ export async function launchBrowserProfile(
     const child = spawn(profile.executablePath, args, {
       detached: true,
       stdio: "ignore",
-      windowsHide: true,
     });
 
     child.unref();
