@@ -3,7 +3,7 @@ export function isLikelyUrl(input: string): boolean {
   if (!trimmed) return false;
 
   // Browser internal schemas
-  if (/^(chrome|edge|brave|vivaldi|arc|about|file):\/\//i.test(trimmed)) {
+  if (/^(chrome|edge|brave|vivaldi|arc|file):\/\//i.test(trimmed) || /^about:/i.test(trimmed)) {
     return true;
   }
 
