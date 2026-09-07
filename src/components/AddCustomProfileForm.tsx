@@ -35,7 +35,7 @@ export function AddCustomProfileForm({ onProfileAdded }: AddCustomProfileFormPro
 
     if (hasError) return;
 
-    const id = custom_;
+    const id = "custom_" + Date.now();
     await saveCustomProfile({
       id,
       browserName: browserName.trim(),
