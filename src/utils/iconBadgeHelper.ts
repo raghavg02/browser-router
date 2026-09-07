@@ -178,11 +178,11 @@ function blendPixel(dst: Buffer, dIdx: number, r: number, g: number, b: number, 
 function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Buffer): Buffer {
   const canvas = Buffer.alloc(256 * 256 * 4);
 
-  // 1. Draw Main Browser Logo (Hero, increased size: 232x232 placed at x:8, y:16)
+  // 1. Draw Main Browser Logo (Hero, extra-large: 244x244 placed at x:2, y:10)
   const browserLogo = decodePng(browserPngBuf);
-  const mainSize = 232;
-  const mainX = 8;
-  const mainY = 16;
+  const mainSize = 244;
+  const mainX = 2;
+  const mainY = 10;
   const scaledBrowser = resizeRgba(browserLogo.pixels, browserLogo.w, browserLogo.h, mainSize, mainSize);
 
   for (let by = 0; by < mainSize; by++) {
@@ -200,11 +200,11 @@ function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Bu
     }
   }
 
-  // 2. Draw Avatar as Notification Badge at TOP-RIGHT (Center at 196, 58; Outer radius 58px; Inner avatar radius 52px)
-  const badgeCx = 196;
-  const badgeCy = 58;
-  const badgeRadius = 58;
-  const avatarRadius = 52;
+  // 2. Draw Avatar as Notification Badge at TOP-RIGHT (Center: 188, 66; Outer radius 66px; Inner avatar radius 60px)
+  const badgeCx = 188;
+  const badgeCy = 66;
+  const badgeRadius = 66;
+  const avatarRadius = 60;
 
   // Elevation drop shadow under the badge
   for (let y = 0; y < 256; y++) {
@@ -234,7 +234,7 @@ function compositeBrowserWithAvatarBadge(browserPngBuf: Buffer, avatarPngBuf: Bu
     }
   }
 
-  // Draw circular cropped avatar inside the badge
+  // Draw circular cropped avatar inside the badge (diameter 120px)
   const av = decodePng(avatarPngBuf);
   const avDrawSize = avatarRadius * 2;
   const scaledAv = resizeRgba(av.pixels, av.w, av.h, avDrawSize, avDrawSize);
@@ -294,13 +294,13 @@ export function ensureAvatarBadgedIcon(
       fs.mkdirSync(profilesDir, { recursive: true });
     }
 
-    const badgedFile = path.join(profilesDir, `v3_badge_${safeProfileId}.png`);
+    const badgedFile = path.join(profilesDir, `v4_badge_${safeProfileId}.png`);
     const avatarStat = fs.statSync(diskAvatarPath);
 
     if (fs.existsSync(badgedFile)) {
       const badgedStat = fs.statSync(badgedFile);
       if (badgedStat.mtimeMs >= avatarStat.mtimeMs) {
-        return `profiles/v3_badge_${safeProfileId}.png`;
+        return `profiles/v4_badge_${safeProfileId}.png`;
       }
     }
 
@@ -315,11 +315,12 @@ export function ensureAvatarBadgedIcon(
     const composited = compositeBrowserWithAvatarBadge(browserLogoBuf, avatarBuf);
 
     fs.writeFileSync(badgedFile, composited);
-    // Also update v2 and legacy for backward compatibility
+    // Also write to earlier filenames for backward compatibility
+    fs.writeFileSync(path.join(profilesDir, `v3_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `v2_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `${safeProfileId}.png`), composited);
 
-    return `profiles/v3_badge_${safeProfileId}.png`;
+    return `profiles/v4_badge_${safeProfileId}.png`;
   } catch (err) {
     console.error(`Failed to generate badged icon for ${safeProfileId}:`, err);
     return undefined;
