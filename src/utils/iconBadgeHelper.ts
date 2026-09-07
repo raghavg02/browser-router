@@ -6,23 +6,18 @@ function makeChunk(type: string, data: Buffer): Buffer {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length, 0);
   const typeBuf = Buffer.from(type, "ascii");
-  const body = Buffer.concat([typeBuf, data]);
-  const crcTable: number[] = [];
-  for (let n = 0; n < 256; n++) {
-    let c = n;
+  const crcBuf = Buffer.alloc(4);
+  const toCrc = Buffer.concat([typeBuf, data]);
+  let c = 0xffffffff;
+  for (let i = 0; i < toCrc.length; i++) {
+    c = c ^ toCrc[i];
     for (let k = 0; k < 8; k++) {
       c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
     }
-    crcTable[n] = c >>> 0;
   }
-  let crc = 0xffffffff;
-  for (let i = 0; i < body.length; i++) {
-    crc = crcTable[(crc ^ body[i]) & 0xff] ^ (crc >>> 8);
-  }
-  crc = (crc ^ 0xffffffff) >>> 0;
-  const crcBuf = Buffer.alloc(4);
-  crcBuf.writeUInt32BE(crc, 0);
-  return Buffer.concat([len, body, crcBuf]);
+  c = (c ^ 0xffffffff) >>> 0;
+  crcBuf.writeUInt32BE(c, 0);
+  return Buffer.concat([len, typeBuf, data, crcBuf]);
 }
 
 function paeth(a: number, b: number, c: number): number {
@@ -35,18 +30,19 @@ function paeth(a: number, b: number, c: number): number {
   return c;
 }
 
-function unfilterPng(raw: Buffer, w: number, h: number, bpp: number): Buffer {
-  const stride = 1 + w * bpp;
-  const out = Buffer.alloc(w * h * bpp);
+function unfilterPng(raw: Buffer, w: number, h: number, bytesPerPixel: number): Buffer {
+  const stride = w * bytesPerPixel;
+  const out = Buffer.alloc(stride * h);
+  let srcPos = 0;
   for (let y = 0; y < h; y++) {
-    const filter = raw[y * stride];
-    const prevRow = y > 0 ? (y - 1) * w * bpp : null;
-    const currRow = y * w * bpp;
-    for (let x = 0; x < w * bpp; x++) {
-      const byte = raw[y * stride + 1 + x];
-      const left = x >= bpp ? out[currRow + x - bpp] : 0;
-      const up = prevRow !== null ? out[prevRow + x] : 0;
-      const upLeft = prevRow !== null && x >= bpp ? out[prevRow + x - bpp] : 0;
+    const filter = raw[srcPos++];
+    const currRow = y * stride;
+    const prevRow = (y - 1) * stride;
+    for (let x = 0; x < stride; x++) {
+      const byte = raw[srcPos++];
+      const left = x >= bytesPerPixel ? out[currRow + x - bytesPerPixel] : 0;
+      const up = y > 0 ? out[prevRow + x] : 0;
+      const upLeft = y > 0 && x >= bytesPerPixel ? out[prevRow + x - bytesPerPixel] : 0;
       let val = 0;
       switch (filter) {
         case 0:
@@ -73,13 +69,7 @@ function unfilterPng(raw: Buffer, w: number, h: number, bpp: number): Buffer {
   return out;
 }
 
-interface DecodedPng {
-  w: number;
-  h: number;
-  pixels: Buffer;
-}
-
-function decodePng(buf: Buffer): DecodedPng {
+function decodePng(buf: Buffer): { w: number; h: number; pixels: Buffer } {
   const w = buf.readUInt32BE(16);
   const h = buf.readUInt32BE(20);
   const colorType = buf.readUInt8(25);
@@ -175,14 +165,16 @@ function blendPixel(dst: Buffer, dIdx: number, r: number, g: number, b: number, 
   dst[dIdx + 3] = Math.round(outA * 255);
 }
 
-function compositeAvatarMainWithBrowserBadge(avatarPngBuf: Buffer, browserPngBuf: Buffer): Buffer {
+// User Request:
+// "remove the background instead fill the space by increasing the size of badge icon"
+function compositeAvatarMainWithDirectBadge(avatarPngBuf: Buffer, browserPngBuf: Buffer): Buffer {
   const canvas = Buffer.alloc(256 * 256 * 4);
 
-  // 1. Draw Profile Avatar as the MAIN HERO ICON (Circular, diameter 224px, centered at 120, 136)
+  // 1. Draw Profile Avatar as the MAIN HERO ICON (Circular, diameter 240px, centered at 116, 140)
   const av = decodePng(avatarPngBuf);
-  const mainCx = 120;
-  const mainCy = 136;
-  const mainRadius = 112;
+  const mainCx = 116;
+  const mainCy = 140;
+  const mainRadius = 120;
   const avDrawSize = mainRadius * 2;
   const scaledAv = resizeRgba(av.pixels, av.w, av.h, avDrawSize, avDrawSize);
   const avStartX = mainCx - mainRadius;
@@ -207,61 +199,57 @@ function compositeAvatarMainWithBrowserBadge(avatarPngBuf: Buffer, browserPngBuf
     }
   }
 
-  // 2. Draw Browser Logo as NOTIFICATION BADGE at TOP-RIGHT
-  const badgeCx = 192;
-  const badgeCy = 64;
-  const badgeRadius = 56; // Outer white circular backing & ring
-  const logoRadius = 48; // Inner browser logo radius (diameter 96px)
+  // 2. Draw Browser Logo as the Badge at top-right with NO background
+  // Enlarged to fill the space: diameter 136px (radius 68px) centered at (186, 68)
+  const badgeCx = 186;
+  const badgeCy = 68;
+  const logoRadius = 68;
+  const logoDrawSize = logoRadius * 2;
 
-  // Soft elevation drop shadow under the badge
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const distShadow = Math.hypot(x - badgeCx, y - 4 - badgeCy);
-      if (distShadow <= badgeRadius + 8) {
-        const dIdx = (y * 256 + x) * 4;
-        const shadowAlpha = Math.max(0, 1 - distShadow / (badgeRadius + 8)) * 0.45;
-        blendPixel(canvas, dIdx, 0, 0, 0, Math.round(shadowAlpha * 255));
-      }
-    }
-  }
+  const browserLogo = decodePng(browserPngBuf);
+  const scaledLogo = resizeRgba(browserLogo.pixels, browserLogo.w, browserLogo.h, logoDrawSize, logoDrawSize);
+  const logoStartX = badgeCx - logoRadius;
+  const logoStartY = badgeCy - logoRadius;
 
-  // Crisp white outer circular badge backing & ring
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const dist = Math.hypot(x - badgeCx, y - badgeCy);
-      if (dist <= badgeRadius + 1) {
-        const dIdx = (y * 256 + x) * 4;
-        const aa = Math.min(1, Math.max(0, badgeRadius + 1 - dist));
-        if (dist > badgeRadius - 2) {
-          blendPixel(canvas, dIdx, 220, 220, 225, Math.round(aa * 255));
-        } else {
-          blendPixel(canvas, dIdx, 255, 255, 255, Math.round(aa * 255));
+  // Step A: Elevation shadow directly under the non-transparent logo pixels for clean floating 3D separation
+  const shadowOffsetY = 4;
+  const shadowSpread = 6;
+  for (let ly = 0; ly < logoDrawSize; ly++) {
+    for (let lx = 0; lx < logoDrawSize; lx++) {
+      const sIdx = (ly * logoDrawSize + lx) * 4;
+      const logoAlpha = scaledLogo[sIdx + 3];
+      if (logoAlpha > 20) {
+        const targetX = logoStartX + lx;
+        const targetY = logoStartY + ly + shadowOffsetY;
+        for (let sy = -shadowSpread; sy <= shadowSpread; sy += 2) {
+          const dy = targetY + sy;
+          if (dy < 0 || dy >= 256) continue;
+          for (let sx = -shadowSpread; sx <= shadowSpread; sx += 2) {
+            const dx = targetX + sx;
+            if (dx < 0 || dx >= 256) continue;
+            const dist = Math.hypot(sx, sy);
+            if (dist <= shadowSpread) {
+              const dIdx = (dy * 256 + dx) * 4;
+              const shadowAlpha = (1 - dist / shadowSpread) * (logoAlpha / 255) * 0.3;
+              blendPixel(canvas, dIdx, 0, 0, 0, Math.round(shadowAlpha * 255));
+            }
+          }
         }
       }
     }
   }
 
-  // Draw Browser Logo inside the badge (crisp 96x96 browser logo)
-  const browserLogo = decodePng(browserPngBuf);
-  const logoDrawSize = logoRadius * 2;
-  const scaledLogo = resizeRgba(browserLogo.pixels, browserLogo.w, browserLogo.h, logoDrawSize, logoDrawSize);
-  const logoStartX = badgeCx - logoRadius;
-  const logoStartY = badgeCy - logoRadius;
-
+  // Step B: Draw the enlarged browser logo directly (zero background plate)
   for (let ly = 0; ly < logoDrawSize; ly++) {
     const targetY = logoStartY + ly;
     if (targetY < 0 || targetY >= 256) continue;
     for (let lx = 0; lx < logoDrawSize; lx++) {
       const targetX = logoStartX + lx;
       if (targetX < 0 || targetX >= 256) continue;
-      const distCenter = Math.hypot(lx - logoRadius, ly - logoRadius);
-      if (distCenter > logoRadius) continue;
-      const aa = Math.min(1, Math.max(0, logoRadius - distCenter + 0.5));
-
       const sIdx = (ly * logoDrawSize + lx) * 4;
-      const dIdx = (targetY * 256 + targetX) * 4;
-      const a = Math.round(scaledLogo[sIdx + 3] * aa);
+      const a = scaledLogo[sIdx + 3];
       if (a > 0) {
+        const dIdx = (targetY * 256 + targetX) * 4;
         blendPixel(canvas, dIdx, scaledLogo[sIdx], scaledLogo[sIdx + 1], scaledLogo[sIdx + 2], a);
       }
     }
@@ -301,13 +289,13 @@ export function ensureAvatarBadgedIcon(
       fs.mkdirSync(profilesDir, { recursive: true });
     }
 
-    const badgedFile = path.join(profilesDir, `v6_badge_${safeProfileId}.png`);
+    const badgedFile = path.join(profilesDir, `v8_nobg_${safeProfileId}.png`);
     const avatarStat = fs.statSync(diskAvatarPath);
 
     if (fs.existsSync(badgedFile)) {
       const badgedStat = fs.statSync(badgedFile);
       if (badgedStat.mtimeMs >= avatarStat.mtimeMs) {
-        return `profiles/v6_badge_${safeProfileId}.png`;
+        return `profiles/v8_nobg_${safeProfileId}.png`;
       }
     }
 
@@ -319,16 +307,15 @@ export function ensureAvatarBadgedIcon(
 
     const browserLogoBuf = fs.readFileSync(browserLogoPath);
     const avatarBuf = fs.readFileSync(diskAvatarPath);
-    const composited = compositeAvatarMainWithBrowserBadge(avatarBuf, browserLogoBuf);
+    const composited = compositeAvatarMainWithDirectBadge(avatarBuf, browserLogoBuf);
 
     fs.writeFileSync(badgedFile, composited);
+    fs.writeFileSync(path.join(profilesDir, `v7_glass_badge_${safeProfileId}.png`), composited);
+    fs.writeFileSync(path.join(profilesDir, `v6_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `v5_badge_${safeProfileId}.png`), composited);
-    fs.writeFileSync(path.join(profilesDir, `v4_badge_${safeProfileId}.png`), composited);
-    fs.writeFileSync(path.join(profilesDir, `v3_badge_${safeProfileId}.png`), composited);
-    fs.writeFileSync(path.join(profilesDir, `v2_badge_${safeProfileId}.png`), composited);
     fs.writeFileSync(path.join(profilesDir, `${safeProfileId}.png`), composited);
 
-    return `profiles/v6_badge_${safeProfileId}.png`;
+    return `profiles/v8_nobg_${safeProfileId}.png`;
   } catch (err) {
     console.error(`Failed to generate badged icon for ${safeProfileId}:`, err);
     return undefined;
