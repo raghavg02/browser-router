@@ -172,7 +172,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "chrome",
       name: "Chrome",
       userDir: path.join(localAppData, "Google", "Chrome", "User Data"),
-      fallbackIcon: "browsers/chrome.svg",
+      fallbackIcon: "extracted/chrome.png",
       exeCandidates: [
         registryBrowsers.get("chrome") || "",
         path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
@@ -184,7 +184,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "edge",
       name: "Edge",
       userDir: path.join(localAppData, "Microsoft", "Edge", "User Data"),
-      fallbackIcon: "browsers/edge.svg",
+      fallbackIcon: "extracted/edge.png",
       exeCandidates: [
         registryBrowsers.get("edge") || "",
         path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
@@ -195,7 +195,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "brave",
       name: "Brave",
       userDir: path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data"),
-      fallbackIcon: "browsers/brave.svg",
+      fallbackIcon: "extracted/brave.png",
       exeCandidates: [
         registryBrowsers.get("brave") || "",
         path.join(programFiles, "BraveSoftware", "Brave-Browser", "Application", "brave.exe"),
@@ -207,7 +207,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "vivaldi",
       name: "Vivaldi",
       userDir: path.join(localAppData, "Vivaldi", "User Data"),
-      fallbackIcon: "browsers/vivaldi.svg",
+      fallbackIcon: "extracted/vivaldi.png",
       exeCandidates: [
         registryBrowsers.get("vivaldi") || "",
         path.join(localAppData, "Vivaldi", "Application", "vivaldi.exe"),
@@ -218,7 +218,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "arc",
       name: "Arc",
       userDir: path.join(localAppData, "Arc", "User Data"),
-      fallbackIcon: "browsers/arc.svg",
+      fallbackIcon: "extension-icon.png",
       exeCandidates: [
         registryBrowsers.get("arc") || "",
         path.join(localAppData, "Arc", "Application", "Arc.exe"),
@@ -229,7 +229,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       id: "opera",
       name: "Opera",
       userDir: path.join(appData, "Opera Software", "Opera Stable"),
-      fallbackIcon: "browsers/opera.svg",
+      fallbackIcon: "extension-icon.png",
       exeCandidates: [
         registryBrowsers.get("opera") || "",
         path.join(localAppData, "Programs", "Opera", "launcher.exe"),
@@ -348,7 +348,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
               profileDirectory: profilePath,
               executablePath: firefoxExe,
               iconPath: ffLogo,
-              fallbackIcon: "browsers/firefox.svg",
+              fallbackIcon: "extension-icon.png",
             });
           }
         }
@@ -369,7 +369,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
         profileDirectory: "default",
         executablePath: firefoxExe,
         iconPath: ffLogo,
-        fallbackIcon: "browsers/firefox.svg",
+        fallbackIcon: "extension-icon.png",
       });
     }
   }
@@ -389,7 +389,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       profileDirectory: cp.profileDirectory,
       executablePath: cp.executablePath,
       iconPath: logoIcon,
-      fallbackIcon: "browsers/browser-default.svg",
+      fallbackIcon: "extension-icon.png",
       isCustom: true,
     });
   }
