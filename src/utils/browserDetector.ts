@@ -3,6 +3,7 @@ import path from "path";
 import { execSync } from "child_process";
 import { BrowserProfile } from "../types";
 import { getCustomProfiles, getFavoriteIds, getProfileNicknames } from "./storage";
+import { ensureAvatarBadgedIcon, getAssetsDir } from "./iconBadgeHelper";
 
 interface ChromiumBrowserDef {
   id: string;
@@ -32,7 +33,7 @@ function findLogoInAppDir(exePath: string): string | undefined {
       }
     }
   } catch {
-    // Ignore directory read errors
+    // Ignore read errors
   }
 
   for (const dir of searchDirs) {
@@ -59,7 +60,8 @@ function getExtractedAssetIcon(browserId: string, exePath?: string): string | un
     if (known.includes(browserId)) {
       return `extracted/${browserId}.png`;
     }
-    const extractedDir = path.join(__dirname, "..", "..", "assets", "extracted");
+    const assetsDir = getAssetsDir();
+    const extractedDir = path.join(assetsDir, "extracted");
     const extractedFile = path.join(extractedDir, `${browserId}.png`);
 
     if (fs.existsSync(extractedFile)) {
@@ -83,51 +85,62 @@ function getExtractedAssetIcon(browserId: string, exePath?: string): string | un
 }
 
 function findExe(candidates: string[]): string | undefined {
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) {
+      return c;
     }
   }
   return undefined;
 }
 
-function cleanRegistryCmd(cmd: string): string {
-  const match = cmd.match(/^"?([^"]+?\.exe)"?/i);
-  return match ? match[1] : cmd.replace(/"/g, "").trim();
-}
+function getRegistryInstalledBrowsers(): Map<string, string> {
+  const browserMap = new Map<string, string>();
+  if (process.platform !== "win32") return browserMap;
 
-function getBrowsersFromRegistry(): Map<string, string> {
-  const map = new Map<string, string>();
-  const keys = ["HKLM\\Software\\Clients\\StartMenuInternet", "HKCU\\Software\\Clients\\StartMenuInternet"];
+  const regQueries = [
+    'reg query "HKLM\\Software\\Clients\\StartMenuInternet" /s',
+    'reg query "HKCU\\Software\\Clients\\StartMenuInternet" /s',
+    'reg query "HKLM\\SOFTWARE\\WOW6432Node\\Clients\\StartMenuInternet" /s',
+  ];
 
-  for (const regKey of keys) {
+  for (const query of regQueries) {
     try {
-      const output = execSync(`reg query "${regKey}" /s`, {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-        windowsHide: true,
-      });
+      const output = execSync(query, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 1500 });
+      const lines = output.split("\n");
+      let currentBrowserKey = "";
 
-      const lines = output.split("\r\n");
-      let currentSubkey = "";
       for (const line of lines) {
         const trimmed = line.trim();
         if (trimmed.startsWith("HKEY_")) {
-          currentSubkey = trimmed;
-        } else if (trimmed.includes("REG_SZ") && currentSubkey.toLowerCase().includes("shell\\open\\command")) {
+          const match = trimmed.match(/StartMenuInternet\\([^\\]+)/i);
+          if (match) {
+            currentBrowserKey = match[1].toLowerCase();
+          }
+        } else if (trimmed.includes("REG_SZ") && currentBrowserKey) {
           const parts = trimmed.split("REG_SZ");
           if (parts.length > 1) {
-            const rawExe = parts[1].trim();
-            const cleaned = cleanRegistryCmd(rawExe);
-            if (fs.existsSync(cleaned)) {
-              const lowerKey = currentSubkey.toLowerCase();
-              if (lowerKey.includes("chrome")) map.set("chrome", cleaned);
-              else if (lowerKey.includes("edge")) map.set("edge", cleaned);
-              else if (lowerKey.includes("brave")) map.set("brave", cleaned);
-              else if (lowerKey.includes("vivaldi")) map.set("vivaldi", cleaned);
-              else if (lowerKey.includes("firefox")) map.set("firefox", cleaned);
-              else if (lowerKey.includes("arc")) map.set("arc", cleaned);
-              else if (lowerKey.includes("opera")) map.set("opera", cleaned);
+            let exePath = parts[1].trim();
+            if (exePath.startsWith('"') && exePath.includes('"', 1)) {
+              exePath = exePath.substring(1, exePath.indexOf('"', 1));
+            } else if (exePath.includes(" ")) {
+              exePath = exePath.split(" ")[0];
+            }
+            if (exePath.toLowerCase().endsWith(".exe") && fs.existsSync(exePath)) {
+              if (currentBrowserKey.includes("chrome") && !browserMap.has("chrome")) {
+                browserMap.set("chrome", exePath);
+              } else if (currentBrowserKey.includes("edge") || currentBrowserKey.includes("msedge")) {
+                if (!browserMap.has("edge")) browserMap.set("edge", exePath);
+              } else if (currentBrowserKey.includes("brave") && !browserMap.has("brave")) {
+                browserMap.set("brave", exePath);
+              } else if (currentBrowserKey.includes("vivaldi") && !browserMap.has("vivaldi")) {
+                browserMap.set("vivaldi", exePath);
+              } else if (currentBrowserKey.includes("firefox") && !browserMap.has("firefox")) {
+                browserMap.set("firefox", exePath);
+              } else if (currentBrowserKey.includes("arc") && !browserMap.has("arc")) {
+                browserMap.set("arc", exePath);
+              } else if (currentBrowserKey.includes("opera") && !browserMap.has("opera")) {
+                browserMap.set("opera", exePath);
+              }
             }
           }
         }
@@ -137,36 +150,23 @@ function getBrowsersFromRegistry(): Map<string, string> {
     }
   }
 
-  return map;
+  return browserMap;
 }
 
-export async function detectAllProfiles(): Promise<BrowserProfile[]> {
-  const possibleLocalAppDatas = [
-    process.env.LOCALAPPDATA,
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "",
-    "C:\\Users\\ragha\\AppData\\Local",
-  ].filter(Boolean) as string[];
-
-  const possibleAppDatas = [
-    process.env.APPDATA,
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Roaming") : "",
-    "C:\\Users\\ragha\\AppData\\Roaming",
-  ].filter(Boolean) as string[];
-
-  const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Local";
-  const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Roaming";
-
+export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const appData = process.env.APPDATA || "";
   const programFiles = process.env.ProgramFiles || "C:\\Program Files";
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
 
-  const registryBrowsers = getBrowsersFromRegistry();
+  const registryBrowsers = getRegistryInstalledBrowsers();
   const nicknames = await getProfileNicknames();
   const profiles: BrowserProfile[] = [];
 
   const chromiumConfigs: ChromiumBrowserDef[] = [
     {
       id: "chrome",
-      name: "Chrome",
+      name: "Google Chrome",
       userDir: path.join(localAppData, "Google", "Chrome", "User Data"),
       fallbackIcon: "browsers/chrome.svg",
       exeCandidates: [
@@ -252,25 +252,17 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
 
         for (const [profileDir, info] of Object.entries(infoCache)) {
           const profilePath = path.join(config.userDir, profileDir);
-          let avatarPath: string | undefined;
-
           const possiblePics = [
             path.join(profilePath, "Google Profile Picture.png"),
             path.join(profilePath, "Edge Profile Picture.png"),
             path.join(profilePath, "Custom Profile Picture.png"),
           ];
+          const diskPic = possiblePics.find((pic) => fs.existsSync(pic));
           const safeProfileId = `${config.id}_${profileDir.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-          const badgedCandidate = path.join(__dirname, "..", "..", "assets", "profiles", `${safeProfileId}.png`);
-          if (fs.existsSync(badgedCandidate)) {
-            avatarPath = `profiles/${safeProfileId}.png`;
-          } else {
-            for (const pic of possiblePics) {
-              if (fs.existsSync(pic)) {
-                avatarPath = pic;
-                break;
-              }
-            }
-          }
+
+          // If disk avatar exists, generate/use the badged icon (main browser logo + top-right avatar notification badge)
+          // If no custom avatar exists, leave avatarPath undefined so it falls back to native browser logo (logoIcon)
+          const avatarPath = diskPic ? ensureAvatarBadgedIcon(config.id, safeProfileId, diskPic) : undefined;
 
           const rawName = info.name || profileDir;
           const profileId = `${config.id}_${profileDir}`;
@@ -405,4 +397,8 @@ export async function detectAllProfiles(): Promise<BrowserProfile[]> {
   }
 
   return profiles;
+}
+
+export async function detectAllProfiles(): Promise<BrowserProfile[]> {
+  return detectInstalledProfiles();
 }
