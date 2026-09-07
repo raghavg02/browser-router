@@ -1,3 +1,4 @@
+import fs from "fs";
 import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
@@ -8,6 +9,15 @@ export async function launchBrowserProfile(
   incognito = false,
 ): Promise<boolean> {
   try {
+    if (!profile.executablePath || !fs.existsSync(profile.executablePath)) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Browser not found",
+        message: profile.executablePath ? `File does not exist: ${profile.executablePath}` : "No executable specified",
+      });
+      return false;
+    }
+
     const args: string[] = [];
 
     if (profile.browserId === "firefox") {
@@ -45,13 +55,21 @@ export async function launchBrowserProfile(
       stdio: "ignore",
     });
 
+    child.on("error", async (err) => {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to launch browser",
+        message: err.message,
+      });
+    });
+
     child.unref();
 
     const modeText = incognito ? " (Incognito)" : "";
     await showToast({
       style: Toast.Style.Success,
       title: `Opened in ${profile.displayName}${modeText}`,
-      message: targetUrl ? (targetUrl.length > 50 ? targetUrl.substring(0, 47) + "…" : targetUrl) : undefined,
+      message: targetUrl ? (targetUrl.length > 50 ? targetUrl.substring(0, 47) + "..." : targetUrl) : undefined,
     });
 
     await closeMainWindow();

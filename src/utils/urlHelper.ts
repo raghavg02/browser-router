@@ -7,8 +7,13 @@ export function isLikelyUrl(input: string): boolean {
     return true;
   }
 
-  // Explicit protocols
-  if (/^https?:\/\//i.test(trimmed) || /^ftp:\/\//i.test(trimmed)) {
+  // Explicit web protocols (must have a host following the protocol)
+  if (/^https?:\/\/[^\s/]+/i.test(trimmed) || /^ftp:\/\/[^\s/]+/i.test(trimmed)) {
+    return true;
+  }
+
+  // Windows absolute file path (e.g. C:\Users\... or D:/docs/...)
+  if (/^[a-zA-Z]:[/\\][^\s]+/i.test(trimmed)) {
     return true;
   }
 
@@ -38,12 +43,20 @@ export function buildTargetUrl(input: string, searchEngine: string = "google", c
   if (!trimmed) return "";
 
   if (isLikelyUrl(trimmed)) {
-    if (/^https?:\/\/|^file:\/\/|^chrome:\/\/|^edge:\/\/|^brave:\/\/|^vivaldi:\/\/|^arc:\/\/|^about:/i.test(trimmed)) {
+    // Already has supported protocol
+    if (/^(https?|ftp|file|chrome|edge|brave|vivaldi|arc):\/\/|^about:/i.test(trimmed)) {
       return trimmed;
     }
+    // Windows local drive path -> file:/// URL
+    if (/^[a-zA-Z]:[/\\]/i.test(trimmed)) {
+      const normalized = trimmed.replace(/\\/g, "/");
+      return `file:///${normalized}`;
+    }
+    // Localhost or IPv4 -> http://
     if (/^localhost/i.test(trimmed) || /^(\d{1,3}\.){3}\d{1,3}/.test(trimmed)) {
       return `http://${trimmed}`;
     }
+    // Standard domain -> https://
     return `https://${trimmed}`;
   }
 
@@ -60,8 +73,16 @@ export function buildTargetUrl(input: string, searchEngine: string = "google", c
     case "ecosia":
       return `https://www.ecosia.org/search?q=${query}`;
     case "custom":
-      if (customUrl && customUrl.includes("%s")) {
-        return customUrl.replace("%s", query);
+      if (customUrl && customUrl.trim()) {
+        const trimmedCustom = customUrl.trim();
+        if (/%s/i.test(trimmedCustom)) {
+          return trimmedCustom.replace(/%s/gi, query);
+        }
+        // Fallback if user omitted %s
+        if (trimmedCustom.endsWith("=") || trimmedCustom.endsWith("/")) {
+          return `${trimmedCustom}${query}`;
+        }
+        return `${trimmedCustom}?q=${query}`;
       }
       return `https://www.google.com/search?q=${query}`;
     case "google":
