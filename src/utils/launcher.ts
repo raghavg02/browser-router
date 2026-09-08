@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
@@ -37,12 +38,7 @@ export async function launchBrowserProfile(
           args.push("--incognito");
         }
       }
-      const shouldPassProfileDir =
-        profile.profileDirectory &&
-        profile.profileDirectory !== "default-no-arg" &&
-        !((profile.browserId === "brave" || profile.browserId === "vivaldi") && profile.profileDirectory === "Default");
-
-      if (shouldPassProfileDir) {
+      if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
         args.push(`--profile-directory=${profile.profileDirectory}`);
       }
       if (targetUrl) {
@@ -50,9 +46,11 @@ export async function launchBrowserProfile(
       }
     }
 
+    const exeDir = path.dirname(profile.executablePath);
     const child = spawn(profile.executablePath, args, {
       detached: true,
       stdio: "ignore",
+      cwd: fs.existsSync(exeDir) ? exeDir : undefined,
     });
 
     child.on("error", async (err) => {
