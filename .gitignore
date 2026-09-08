@@ -44,3 +44,6 @@ yarn-error.log*
 # Private ideas & feature roadmap
 IDEAS.md
 ROADMAP.md
+
+# Generated profile badges cache (runtime-generated per user)
+assets/profiles/
