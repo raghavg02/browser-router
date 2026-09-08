@@ -34,7 +34,7 @@ Raycast typically defaults to opening links and searches in your system's defaul
 3. Type your search query or URL (e.g., `github.com` or `react hooks guide`).
 4. Press `Enter` to open the profile picker.
 5. Choose your desired browser & profile:
-   - Type the name of the browser or profile (e.g., `Raghav`, `Chrome`, `Brave`) and press `Enter`.
+   - Type the name of the browser or profile (e.g., `Work`, `Chrome`, `Brave`) and press `Enter`.
    - Use the **Up/Down** arrow keys and press `Enter`.
    - Click on the item from the list.
 

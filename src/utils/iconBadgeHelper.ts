@@ -1,3 +1,4 @@
+import os from "os";
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
@@ -259,18 +260,19 @@ function compositeAvatarMainWithDirectBadge(avatarPngBuf: Buffer, browserPngBuf:
 }
 
 export function getAssetsDir(): string {
+  const home = os.homedir();
   const candidates = [
     path.join(__dirname, "assets"),
     path.join(__dirname, "..", "assets"),
     path.join(__dirname, "..", "..", "assets"),
-    "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\assets",
-    "C:\\Users\\ragha\\.config\\raycast-x\\extensions\\search-router\\assets",
-    "C:\\Users\\ragha\\AppData\\Local\\Raycast\\extensions\\search-router\\assets",
+    path.join(home, ".config", "raycast", "extensions", "search-router", "assets"),
+    path.join(home, ".config", "raycast-x", "extensions", "search-router", "assets"),
+    path.join(home, "AppData", "Local", "Raycast", "extensions", "search-router", "assets"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  return "C:\\Users\\ragha\\.config\\raycast\\extensions\\search-router\\assets";
+  return path.join(home, ".config", "raycast", "extensions", "search-router", "assets");
 }
 
 export function ensureAvatarBadgedIcon(

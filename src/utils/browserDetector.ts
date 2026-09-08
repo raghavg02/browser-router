@@ -1,3 +1,4 @@
+import os from "os";
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
@@ -149,17 +150,17 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
   const possibleLocalAppDatas = [
     process.env.LOCALAPPDATA,
     process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "",
-    "C:\\Users\\ragha\\AppData\\Local",
+    path.join(os.homedir(), "AppData", "Local"),
   ].filter(Boolean) as string[];
 
   const possibleAppDatas = [
     process.env.APPDATA,
     process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Roaming") : "",
-    "C:\\Users\\ragha\\AppData\\Roaming",
+    path.join(os.homedir(), "AppData", "Roaming"),
   ].filter(Boolean) as string[];
 
-  const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Local";
-  const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || "C:\\Users\\ragha\\AppData\\Roaming";
+  const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || path.join(os.homedir(), "AppData", "Local");
+  const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || path.join(os.homedir(), "AppData", "Roaming");
   const programFiles = process.env.ProgramFiles || "C:\\Program Files";
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
 
