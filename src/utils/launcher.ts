@@ -1,8 +1,30 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
+
+function getWindowsShellHelperPath(): string {
+  const vbsPath = path.join(os.tmpdir(), "search_router_launch.vbs");
+  if (!fs.existsSync(vbsPath)) {
+    fs.writeFileSync(
+      vbsPath,
+      'Set s=CreateObject("Shell.Application")\n' +
+        'args=""\n' +
+        'cwd=""\n' +
+        "If WScript.Arguments.Count > 1 Then\n" +
+        "  args = WScript.Arguments(1)\n" +
+        "End If\n" +
+        "If WScript.Arguments.Count > 2 Then\n" +
+        "  cwd = WScript.Arguments(2)\n" +
+        "End If\n" +
+        's.ShellExecute WScript.Arguments(0), args, cwd, "open", 1\n',
+      "utf8",
+    );
+  }
+  return vbsPath;
+}
 
 export async function launchBrowserProfile(
   profile: BrowserProfile,
@@ -20,59 +42,89 @@ export async function launchBrowserProfile(
     }
 
     const exeDir = path.dirname(profile.executablePath);
-    const args: string[] = [];
+    const argsParts: string[] = [];
 
     if (profile.browserId === "firefox") {
       if (incognito) {
-        args.push("-private-window");
+        argsParts.push("-private-window");
       }
       if (profile.profileDirectory && profile.profileDirectory !== "default") {
-        args.push("-P", profile.profileDirectory);
+        argsParts.push("-P", `"${profile.profileDirectory}"`);
       }
       if (targetUrl) {
-        args.push(targetUrl);
+        argsParts.push(`"${targetUrl}"`);
       }
     } else {
       // Chromium browsers (Chrome, Edge, Brave, Vivaldi, Arc, Opera, etc.)
       if (incognito) {
         if (profile.browserId === "edge") {
-          args.push("--inprivate");
+          argsParts.push("--inprivate");
         } else {
-          args.push("--incognito");
+          argsParts.push("--incognito");
         }
       }
 
       if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
-        args.push(`--profile-directory=${profile.profileDirectory}`);
+        if (profile.profileDirectory.includes(" ")) {
+          argsParts.push(`--profile-directory="${profile.profileDirectory}"`);
+        } else {
+          argsParts.push(`--profile-directory=${profile.profileDirectory}`);
+        }
       }
 
       if (targetUrl) {
-        args.push(targetUrl);
+        argsParts.push(`"${targetUrl}"`);
       }
     }
 
-    // Direct process spawn using Node's standard libuv command line formatting.
-    // NOTE: Never use windowsVerbatimArguments: true on Windows!
-    // When windowsVerbatimArguments is true, libuv does not wrap executable paths containing spaces
-    // (e.g. C:\Program Files\...) in quotes. Windows CreateProcessW then parses "Files\..." as argv[1],
-    // which Chromium interprets as a URL, opening bogus "http://files/..." or "http://(x86)/..." tabs.
-    // With standard spawn, Node automatically quotes executable paths and arguments with spaces safely.
-    const child = spawn(profile.executablePath, args, {
-      detached: true,
-      stdio: "ignore",
-      cwd: fs.existsSync(exeDir) ? exeDir : undefined,
-      env: process.env,
-    });
+    if (process.platform === "win32") {
+      // On Windows, Raycast runs as an MSIX packaged app (WindowsApps).
+      // Child processes spawned directly via Node inside an MSIX container inherit the MSIX
+      // package identity, which causes Windows to virtualize %LOCALAPPDATA% into %LOCALAPPDATA%\\Temp
+      // and restricts DPAPI encryption keys. This caused cold-started browsers (Brave and Vivaldi)
+      // to open into an unauthenticated, isolated "Temp" profile instead of the real user profile.
+      //
+      // Calling Windows Desktop Shell (Shell.Application.ShellExecute via wscript) delegates the launch
+      // to explorer.exe (the Windows interactive desktop shell). This launches the browser as a true
+      // top-level desktop process in the active desktop session with full access to the real %LOCALAPPDATA%
+      // and all authenticated logins, sessions, and cookies.
+      const helperPath = getWindowsShellHelperPath();
+      const argsString = argsParts.join(" ");
 
-    child.on("error", async (err) => {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Failed to launch browser",
-        message: err.message,
+      const child = spawn("wscript.exe", [helperPath, profile.executablePath, argsString, exeDir || ""], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
       });
-    });
 
-    child.unref();
+      child.on("error", async (err) => {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Failed to launch browser",
+          message: err.message,
+        });
+      });
+
+      child.unref();
+    } else {
+      // macOS / Linux standard spawn
+      const child = spawn(profile.executablePath, argsParts, {
+        detached: true,
+        stdio: "ignore",
+        cwd: fs.existsSync(exeDir) ? exeDir : undefined,
+        env: process.env,
+      });
+
+      child.on("error", async (err) => {
+        await showToast({
+          style: Toast.Style.Failure,
+          title: "Failed to launch browser",
+          message: err.message,
+        });
+      });
+
+      child.unref();
+    }
 
     const modeText = incognito ? " (Incognito)" : "";
     await showToast({
