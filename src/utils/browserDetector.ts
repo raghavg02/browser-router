@@ -159,7 +159,8 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
     path.join(os.homedir(), "AppData", "Roaming"),
   ].filter(Boolean) as string[];
 
-  const localAppData = possibleLocalAppDatas.find((p) => fs.existsSync(p)) || path.join(os.homedir(), "AppData", "Local");
+  const localAppData =
+    possibleLocalAppDatas.find((p) => fs.existsSync(p)) || path.join(os.homedir(), "AppData", "Local");
   const appData = possibleAppDatas.find((p) => fs.existsSync(p)) || path.join(os.homedir(), "AppData", "Roaming");
   const programFiles = process.env.ProgramFiles || "C:\\Program Files";
   const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";

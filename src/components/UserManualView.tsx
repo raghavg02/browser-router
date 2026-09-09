@@ -183,11 +183,7 @@ Found a bug or have an idea for a feature?
       markdown={markdown}
       actions={
         <ActionPanel>
-          <Action
-            title="Back to Search Router"
-            icon={Icon.ArrowLeft}
-            onAction={handleBack}
-          />
+          <Action title="Back to Search Router" icon={Icon.ArrowLeft} onAction={handleBack} />
           <Action.Push
             title="Send Feedback / Feature Request"
             icon={Icon.Envelope}

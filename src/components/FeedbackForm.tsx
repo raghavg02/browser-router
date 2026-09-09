@@ -63,7 +63,7 @@ export function FeedbackForm() {
           description,
           email,
           savedAt: Date.now(),
-        })
+        }),
       );
     }
   }, [category, customCategory, title, description, email]);
@@ -88,12 +88,12 @@ export function FeedbackForm() {
     category === "bug"
       ? "e.g. Brave profile not loading logins, Edge inprivate shortcut..."
       : category === "feature"
-      ? "e.g. Auto-detect Zen Browser, custom URL query presets..."
-      : category === "general"
-      ? "e.g. Loving the dual-mode search, quick idea on list layout..."
-      : category === "other"
-      ? "e.g. Shortcut customization, UI layout proposal..."
-      : "e.g. Add Zen Browser support, or Brave profile launch issue...";
+        ? "e.g. Auto-detect Zen Browser, custom URL query presets..."
+        : category === "general"
+          ? "e.g. Loving the dual-mode search, quick idea on list layout..."
+          : category === "other"
+            ? "e.g. Shortcut customization, UI layout proposal..."
+            : "e.g. Add Zen Browser support, or Brave profile launch issue...";
 
   interface FormValues {
     category?: string;
@@ -196,7 +196,11 @@ export function FeedbackForm() {
       timestamp: new Date().toISOString(),
     };
 
-    console.log("[FeedbackForm] Sending payload to Cloudflare:", { category: selectedCategory, title: enteredTitle.trim(), email: trimmedEmail });
+    console.log("[FeedbackForm] Sending payload to Cloudflare:", {
+      category: selectedCategory,
+      title: enteredTitle.trim(),
+      email: trimmedEmail,
+    });
     if (FEEDBACK_WORKER_URL && FEEDBACK_WORKER_URL.trim().startsWith("https://")) {
       try {
         const response = await fetch(FEEDBACK_WORKER_URL.trim(), {
@@ -248,11 +252,7 @@ export function FeedbackForm() {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm
-            title="Submit Feedback"
-            icon={Icon.Envelope}
-            onSubmit={handleSubmit}
-          />
+          <Action.SubmitForm title="Submit Feedback" icon={Icon.Envelope} onSubmit={handleSubmit} />
           <Action
             title="Clear Draft"
             icon={Icon.Trash}
