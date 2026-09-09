@@ -1,13 +1,13 @@
-# Contributing to Search Router
+# Contributing to Browser Router
 
-First off, thank you for considering contributing to Search Router! Open source contributions make tools better for everyone.
+First off, thank you for considering contributing to Browser Router! Open source contributions make tools better for everyone.
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-- **Operating System**: Windows 10 or Windows 11 (Search Router is engineered specifically for the Windows desktop ecosystem).
+- **Operating System**: Windows 10 or Windows 11 (Browser Router is engineered specifically for the Windows desktop ecosystem).
 - **Raycast for Windows**: Latest version of [Raycast](https://raycast.com).
 - **Node.js**: Version 18.x or higher.
 - **npm**: Included with Node.js.
@@ -16,7 +16,7 @@ First off, thank you for considering contributing to Search Router! Open source 
 1. Fork and clone the repository:
    ```bash
    git clone https://github.com/raghavg02/search-router.git
-   cd search-router
+   cd browser-router
    ```
 2. Install dependencies:
    ```bash

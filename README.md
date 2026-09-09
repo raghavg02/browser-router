@@ -1,10 +1,10 @@
 <div align="center">
 
   <a href="https://github.com/raghavg02/search-router">
-    <img src="assets/extension-icon.png" alt="Search Router Logo" width="100" height="100" />
+    <img src="assets/extension-icon.png" alt="Browser Router Logo" width="100" height="100" />
   </a>
 
-  # Search Router
+  # Browser Router
 
   <p>
     <b>Intelligent, profile-aware browser & search engine router engineered for Windows desktop workflows in Raycast.</b>
@@ -67,7 +67,7 @@ On macOS, Raycast power users easily route links to specific browser profiles. O
 * **Multi-Profile Chaos**: Developers, founders, and students juggle distinct profiles (*Personal*, *Work*, *Client Staging*, *College*). Switching between them requires opening the browser first, clicking the avatar menu, and navigating to the target account.
 * **The Windows Sandbox / Isolation Bug**: Naive attempts to launch Chromium browsers with `--profile-directory` from within packaged Windows apps or node child processes run into Windows Job Object / AppContainer isolation. This opens browsers in **phantom/guest sessions where cookies, active logins, and sessions are lost**.
 
-**Search Router** solves all three problems with a **sub-35ms native detachment engine**, deep registry-driven profile detection, and an intelligent URL/query classification lexer.
+**Browser Router** solves all three problems with a **sub-35ms native detachment engine**, deep registry-driven profile detection, and an intelligent URL/query classification lexer.
 
 <br />
 
@@ -75,7 +75,7 @@ On macOS, Raycast power users easily route links to specific browser profiles. O
 
 ## Built With
 
-Search Router is built with modern, lightweight, and type-safe technologies:
+Browser Router is built with modern, lightweight, and type-safe technologies:
 
 * [![Raycast API](https://img.shields.io/badge/Raycast%20API-v1.104+-FF6363?style=flat-square&logo=raycast&logoColor=white)](https://developers.raycast.com/) — Native Windows desktop UI and action system
 * [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) — Type safety and robust data structures
@@ -161,12 +161,12 @@ Search Router is built with modern, lightweight, and type-safe technologies:
 
 ## How It Works (Architecture)
 
-Search Router is engineered specifically to overcome the constraints of Windows packaged desktop applications.
+Browser Router is engineered specifically to overcome the constraints of Windows packaged desktop applications.
 
 ```mermaid
 flowchart TD
     subgraph Input ["1. User Input in Raycast"]
-        A[User Query or URL] --> B[Search Router Command]
+        A[User Query or URL] --> B[Browser Router Command]
     end
 
     subgraph Lexer ["2. Intelligent Lexer"]
@@ -196,7 +196,7 @@ When an extension executes inside Raycast on Windows, child processes spawned vi
 Because modern Chromium browsers enforce single-instance IPC checks and DPAPI master key encryption based on interactive user desktop security tokens, running inside an inherited job container causes Chromium to fail to acquire write locks on profile SQLite databases (`Cookies`, `Web Data`, `Login Data`), opening a blank, unauthenticated session.
 
 **The Solution:**
-Search Router uses low-level Libuv process detachment:
+Browser Router uses low-level Libuv process detachment:
 ```typescript
 const child = spawn(browserExePath, launchArgs, {
   detached: true,
@@ -212,7 +212,7 @@ child.unref();
 ### 2. Chromium Dual-Argument Directory Targeting
 Passing `--profile-directory="Profile 1"` alone is fragile on Windows. If Chromium is launched outside native shell associations, it defaults to the generic default user data root.
 
-Search Router dynamically detects and pairs the root user data directory with the profile folder:
+Browser Router dynamically detects and pairs the root user data directory with the profile folder:
 ```typescript
 const launchArgs = [
   `--user-data-dir=${browser.userDataDir}`,
@@ -225,7 +225,7 @@ This guarantees deterministic profile targeting across Chrome, Edge, Brave, Viva
 <br />
 
 ### 3. Registry & Local State Metadata Discovery
-Rather than hardcoding filesystem paths, Search Router inspects both Windows Registry hives:
+Rather than hardcoding filesystem paths, Browser Router inspects both Windows Registry hives:
 * `HKCU\Software\Clients\StartMenuInternet` (Per-user installations)
 * `HKLM\Software\Clients\StartMenuInternet` (System-wide installations)
 
@@ -285,13 +285,13 @@ An instantaneous regex-free tokenizer classifies user input in real time:
 ## Getting Started
 
 ### Installation via Raycast Store
-Search for **Search Router** in the Raycast Store and click **Install Extension**.
+Search for **Browser Router** in the Raycast Store and click **Install Extension**.
 
 ### Local Development Setup
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/raghavg02/search-router.git
-   cd search-router
+   cd browser-router
    ```
 
 2. **Install dependencies:**
@@ -317,7 +317,7 @@ Search for **Search Router** in the Raycast Store and click **Install Extension*
 
 ## Privacy & Security
 
-* **Zero Telemetry**: Search Router collects no telemetry, metrics, or analytics.
+* **Zero Telemetry**: Browser Router collects no telemetry, metrics, or analytics.
 * **No Access to Sensitive Data**: Never accesses browsing history, saved passwords, cookies, or DPAPI master keys.
 * **100% On-Device Operation**: All detection and routing occur strictly on your local PC.
 * Read our full [Privacy Policy](PRIVACY.md) and [Security Policy](SECURITY.md).

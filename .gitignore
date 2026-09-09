@@ -17,7 +17,11 @@ compiled_raycast_rust
 # Built bundles (Raycast builds these from src/ upon publishing)
 *.js.map
 search-router.js
-search-router.js.map
+browser-router.js
+browser-router.js.map
+search-router.js
+browser-router.js
+browser-router.js.map.map
 dist/
 
 # OS and Editor files
@@ -47,3 +51,4 @@ ROADMAP.md
 
 # Generated profile badges cache (runtime-generated per user)
 assets/profiles/
+

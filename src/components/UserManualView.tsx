@@ -42,26 +42,26 @@ export function UserManualView({ onDismissFirstRun, isFirstRun = false }: UserMa
     const img5 = getScreenshotUri("05_rename_profile.png");
     const img6 = getScreenshotUri("06_custom_profile.png");
 
-    return `# 🧭 Search Router — Complete User Manual & Guide
+    return `# 🧭 Browser Router — Complete User Manual & Guide
 
-Welcome to **Search Router**! Search Router gives you instant, keyboard-driven control over routing web searches and URLs to any browser and profile installed on Windows.
+Welcome to **Browser Router**! Browser Router gives you instant, keyboard-driven control over routing web searches and URLs to any browser and profile installed on Windows.
 
 ---
 
 ## ⚡ 1. Root Search & Fallback Command
 
-You can use Search Router directly from Raycast's home search bar! Whenever you type a search query or URL, Search Router appears as an instant fallback command.
+You can use Browser Router directly from Raycast's home search bar! Whenever you type a search query or URL, Browser Router appears as an instant fallback command.
 
 ![Raycast Root Search & Fallback](${img1})
 
 * Type your search query or web URL on Raycast's home screen.
-* Press **\`Enter\`** on **Search Router** to route it immediately to your favorite browser profile.
+* Press **\`Enter\`** on **Browser Router** to route it immediately to your favorite browser profile.
 
 ---
 
 ## 🚀 2. Instant Query & Argument Routing
 
-Search Router supports direct argument execution, letting you pass queries seamlessly from shortcuts or quick links:
+Browser Router supports direct argument execution, letting you pass queries seamlessly from shortcuts or quick links:
 
 ![Query & Argument Routing](${img2})
 
@@ -129,9 +129,9 @@ If you use portable browsers, developer builds (Canary, Developer Edition), or n
 
 ## 🌐 URL & Destination Routing Cheat-Sheet
 
-Search Router automatically detects and parses whatever you type:
+Browser Router automatically detects and parses whatever you type:
 
-| Input Type | Example | How Search Router Handles It |
+| Input Type | Example | How Browser Router Handles It |
 | :--- | :--- | :--- |
 | **Search Query** | \`modern web design\` | Encodes query and routes to your configured search engine |
 | **Standard URL** | \`https://news.ycombinator.com\` | Opens destination directly without searching |
@@ -163,7 +163,7 @@ Search Router automatically detects and parses whatever you type:
 
 ## 🛡️ Authentic Profile Persistence on Windows
 
-Unlike basic URL openers that launch temporary guest sessions, Search Router features **deep Windows profile detection**:
+Unlike basic URL openers that launch temporary guest sessions, Browser Router features **deep Windows profile detection**:
 * Detects genuine user data directories for **Chrome, Microsoft Edge, Brave, Vivaldi, and Chromium**.
 * Preserves all logins, cookies, extensions, and bookmarks across sessions.
 * Seamlessly coordinates with already running browser windows without duplicate processes.
@@ -173,7 +173,7 @@ Unlike basic URL openers that launch temporary guest sessions, Search Router fea
 ## 💬 Community & Direct Feedback
 
 Found a bug or have an idea for a feature?
-* Press **\`Ctrl + Shift + F\`** anywhere in Search Router.
+* Press **\`Ctrl + Shift + F\`** anywhere in Browser Router.
 * Submit a report directly to the development team via our automated relay.
 `;
   }, []);
@@ -183,7 +183,7 @@ Found a bug or have an idea for a feature?
       markdown={markdown}
       actions={
         <ActionPanel>
-          <Action title="Back to Search Router" icon={Icon.ArrowLeft} onAction={handleBack} />
+          <Action title="Back to Browser Router" icon={Icon.ArrowLeft} onAction={handleBack} />
           <Action.Push
             title="Send Feedback / Feature Request"
             icon={Icon.Envelope}

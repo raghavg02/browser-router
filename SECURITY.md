@@ -11,7 +11,7 @@
 
 ## Reporting a Vulnerability
 
-The Search Router team takes the security and integrity of our software seriously. If you discover a security vulnerability or potential threat within this extension, please practice responsible disclosure.
+The Browser Router team takes the security and integrity of our software seriously. If you discover a security vulnerability or potential threat within this extension, please practice responsible disclosure.
 
 ### How to Report
 1. **GitHub Security Advisory**: Submit a private advisory via GitHub's "Security" tab if available on the repository.
@@ -28,11 +28,11 @@ We will review your submission promptly, validate the findings, and coordinate a
 
 ## Security Architecture & Design Guarantees
 
-Search Router enforces defense-in-depth engineering principles:
+Browser Router enforces defense-in-depth engineering principles:
 
 1. **Zero Shell Injection**:
    - Browser executables and target URLs are launched strictly through Node's child_process.spawn() with shell: false. Arguments are supplied as discrete array tokens, completely bypassing cmd.exe or powershell.exe command line interpretation.
 2. **Credential Isolation**:
-   - Search Router never attempts to read, decrypt, or process browser cookies, DPAPI master keys, or saved passwords.
+   - Browser Router never attempts to read, decrypt, or process browser cookies, DPAPI master keys, or saved passwords.
 3. **Serverless Secret Protection**:
    - No sensitive third-party webhook tokens or developer keys are bundled into the client application. The feedback mechanism is proxied via a Cloudflare Worker where secrets remain encrypted in worker environment memory.

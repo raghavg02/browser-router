@@ -1,5 +1,5 @@
 /**
- * Feedback Configuration for Search Router
+ * Feedback Configuration for Browser Router
  *
  * Routes feedback through a secure Cloudflare Worker relay to protect
  * Discord Webhook URLs from being exposed in client bundles or public git repos.

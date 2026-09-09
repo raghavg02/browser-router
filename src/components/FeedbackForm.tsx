@@ -192,7 +192,7 @@ export function FeedbackForm() {
       description: enteredDescription.trim(),
       color: embedColor,
       fields,
-      footer: { text: "Search Router v1.0" },
+      footer: { text: "Browser Router v1.0" },
       timestamp: new Date().toISOString(),
     };
 
