@@ -19,6 +19,7 @@ import { launchBrowserProfile } from "./utils/launcher";
 import { toggleFavorite, removeCustomProfile } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
 import { RenameProfileForm } from "./components/RenameProfileForm";
+import { FeedbackForm } from "./components/FeedbackForm";
 
 export default function Command(props: LaunchProps<{ arguments: { query?: string }; fallbackText?: string }>) {
   const preferences = getPreferenceValues<ExtensionPreferences>();
@@ -201,6 +202,15 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               ) : null}
             </ActionPanel.Section>
 
+            <ActionPanel.Section title="Help & Feedback">
+              <Action.Push
+                title="Send Feedback / Feature Request"
+                icon={Icon.Envelope}
+                shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
+                target={<FeedbackForm />}
+              />
+            </ActionPanel.Section>
+
             <ActionPanel.Section>
               <Action
                 title="Refresh Browsers & Profiles"
@@ -268,6 +278,12 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               target={<AddCustomProfileForm onProfileAdded={loadProfiles} />}
             />
             <Action title="Refresh Browsers & Profiles" icon={Icon.ArrowClockwise} onAction={loadProfiles} />
+            <Action.Push
+              title="Send Feedback / Feature Request"
+              icon={Icon.Envelope}
+              shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
+              target={<FeedbackForm />}
+            />
           </ActionPanel>
         }
       />
