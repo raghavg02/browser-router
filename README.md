@@ -1,134 +1,202 @@
-﻿<div align="center">
+<div align="center">
 
-  <img src="assets/extension-icon.png" alt="Search Router Logo" width="120" height="120" />
+  <a href="https://github.com/raghavg02/search-router">
+    <img src="assets/extension-icon.png" alt="Search Router Logo" width="100" height="100" />
+  </a>
 
-  # Search Router for Raycast
+  # Search Router
 
-  ### Intelligent, profile-aware browser & search router engineered for Windows power users.
+  <p>
+    <b>Intelligent, profile-aware browser & search engine router engineered for Windows desktop workflows in Raycast.</b>
+  </p>
 
-  [![Raycast Extension](https://img.shields.io/badge/Raycast-Extension-red.svg?style=flat-square&logo=raycast&logoColor=white)](https://raycast.com)
-  [![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=flat-square&logo=windows&logoColor=white)](https://microsoft.com/windows)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-  [![Zero Telemetry](https://img.shields.io/badge/Telemetry-Zero%20%28100%25%20Local%29-brightgreen.svg?style=flat-square)](#privacy--telemetry-guarantee)
+  <p>
+    <a href="https://raycast.com"><img src="https://img.shields.io/badge/Raycast-Extension-red.svg?style=flat-square&logo=raycast&logoColor=white" alt="Raycast Extension" /></a>
+    <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=flat-square&logo=windows&logoColor=white" alt="Platform: Windows" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License: MIT" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-blue.svg?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+    <a href="PRIVACY.md"><img src="https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen.svg?style=flat-square" alt="100% Local" /></a>
+  </p>
 
-  <p align="center">
-    <a href="#the-problem-it-solves">Problem</a> •
+  <p>
+    <a href="#about-the-project">About</a> •
+    <a href="#key-features">Features</a> •
     <a href="#visual-showcase">Visual Tour</a> •
-    <a href="#under-the-hood-engineering-deep-dive">Under The Hood</a> •
-    <a href="#features-at-a-glance">Features</a> •
+    <a href="#how-it-works-architecture">Architecture</a> •
     <a href="#keyboard-shortcuts">Shortcuts</a> •
-    <a href="#installation--development">Development</a> •
+    <a href="#getting-started">Getting Started</a> •
     <a href="#license">License</a>
   </p>
 
 </div>
 
+<br />
+
+<details>
+  <summary><b>📑 Table of Contents (Click to expand)</b></summary>
+  <ol>
+    <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#built-with">Built With</a></li>
+    <li><a href="#key-features">Key Features</a></li>
+    <li><a href="#visual-showcase">Visual Showcase</a></li>
+    <li><a href="#how-it-works-architecture">How It Works (Architecture)</a>
+      <ul>
+        <li><a href="#1-escaping-the-windows-job-object-sandbox">Windows Job Object Detachment</a></li>
+        <li><a href="#2-chromium-dual-argument-directory-targeting">Dual-Argument Directory Targeting</a></li>
+        <li><a href="#3-registry--local-state-metadata-discovery">Registry & Local State Discovery</a></li>
+        <li><a href="#4-zero-overhead-url--query-classification">Zero-Overhead Input Classification</a></li>
+      </ul>
+    </li>
+    <li><a href="#supported-browsers">Supported Browsers</a></li>
+    <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
+    <li><a href="#privacy--security">Privacy & Security</a></li>
+    <li><a href="#license">License</a></li>
+  </ol>
+</details>
+
+<br />
+
 ---
 
-## The Problem It Solves
+## About The Project
 
-On macOS, Raycast power users rely on URL-routing utilities to open links in designated browsers and profiles. On **Windows**, however, desktop users face severe limitations:
+On macOS, Raycast power users easily route links to specific browser profiles. On **Windows**, however, users face frustrating roadblocks:
 
-1. **System Default Lock-in**: Raycast on Windows delegates search queries and URLs strictly to the OS-wide default browser.
-2. **Multi-Profile Chaos**: Developers and productivity professionals maintain distinct profiles—*Work*, *Personal*, *Client Staging*, *Research*, and *Development*. Switching between them normally requires opening the browser first, navigating to the avatar switcher, and pasting the URL.
-3. **The Windows Sandbox / Isolation Bug**: Naive attempts to launch Chromium browsers with `--profile-directory` from within packaged Windows apps or node child processes often run into Windows Job Object / AppContainer isolation. This launches browsers into **phantom/temporary profiles where cookies, active logins, and sessions are lost**.
+* **System Default Lock-in**: Windows delegates all links strictly to your default browser, forcing you to manually copy-paste URLs across profiles.
+* **Multi-Profile Chaos**: Developers, founders, and students juggle distinct profiles (*Personal*, *Work*, *Client Staging*, *College*). Switching between them requires opening the browser first, clicking the avatar menu, and navigating to the target account.
+* **The Windows Sandbox / Isolation Bug**: Naive attempts to launch Chromium browsers with `--profile-directory` from within packaged Windows apps or node child processes run into Windows Job Object / AppContainer isolation. This opens browsers in **phantom/guest sessions where cookies, active logins, and sessions are lost**.
 
-**Search Router** solves all three problems with a sub-35ms native detachment engine, deep registry-driven profile detection, and an intelligent URL/query classification lexer.
+**Search Router** solves all three problems with a **sub-35ms native detachment engine**, deep registry-driven profile detection, and an intelligent URL/query classification lexer.
+
+<br />
+
+---
+
+## Built With
+
+Search Router is built with modern, lightweight, and type-safe technologies:
+
+* [![Raycast API](https://img.shields.io/badge/Raycast%20API-v1.104+-FF6363?style=flat-square&logo=raycast&logoColor=white)](https://developers.raycast.com/) — Native Windows desktop UI and action system
+* [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) — Type safety and robust data structures
+* [![React](https://img.shields.io/badge/React-19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/) — Declarative component architecture
+* [![Node.js](https://img.shields.io/badge/Node.js-Process%20Engine-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/) — Libuv detached process spawning
+* [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Worker%20Relay-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/) — Encrypted serverless edge relay for feedback
+
+<br />
+
+---
+
+## Key Features
+
+* ⚡ **Instant Native Dispatch (< 35ms)**  
+  Launches browser profiles directly into the interactive Windows desktop session with zero perceptible delay.
+
+* 🎯 **Dual-Mode Input Routing**  
+  Seamlessly accepts queries from **Raycast Root Search** (press <kbd>Tab</kbd>) or acts as an automatic **Fallback Command**.
+
+* 🔍 **Deep Profile & Avatar Auto-Discovery**  
+  Scans the Windows Registry and parses browser metadata (`Local State`, `Preferences`) to discover profiles, display names, and profile pictures.
+
+* 🌐 **Smart URL vs. Query Classification**  
+  Differentiates between plain text searches, bare domains (`github.com`), and local dev servers (`localhost:3000`, `127.0.0.1:8080`).
+
+* 🏷️ **Custom Profile Names & Portable Setups**  
+  Assign custom nicknames (*"Stripe Staging"*, *"Personal"*) or connect custom browser executables and portable folders.
+
+* 🎨 **Configurable Search Engines**  
+  Switch between Google, DuckDuckGo, Brave Search, Bing, Perplexity, Ecosia, or specify a custom URL template with `%s`.
+
+* 🔒 **100% Offline & Private**  
+  No tracking, no analytics, no background services. Only voluntary in-app feedback uses an encrypted HTTPS edge relay.
+
+<br />
 
 ---
 
 ## Visual Showcase
 
-<div align="center">
+<table align="center" width="100%">
+  <tr>
+    <td align="center" width="50%">
+      <h3>1. Root Search Fast Routing</h3>
+      <p><i>Type your search query directly from Raycast Root Search with Tab-completion.</i></p>
+      <img src="assets/screenshots/01_root_search.png" alt="Root Search" width="460" />
+    </td>
+    <td align="center" width="50%">
+      <h3>2. Intelligent Query & URL Lexing</h3>
+      <p><i>Auto-detects localhost, dev ports, bare domains, and search queries.</i></p>
+      <img src="assets/screenshots/02_query_routing.png" alt="Query Routing" width="460" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <h3>3. Real-Time Profile Filtering</h3>
+      <p><i>Filter profiles instantly by browser brand, account email, or nickname.</i></p>
+      <img src="assets/screenshots/03_profile_filter.png" alt="Profile Filtering" width="460" />
+    </td>
+    <td align="center" width="50%">
+      <h3>4. Power Action Panel</h3>
+      <p><i>Instant access to profile renaming, custom setups, link copying, and feedback.</i></p>
+      <img src="assets/screenshots/04_action_panel.png" alt="Action Panel" width="460" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <h3>5. In-Place Profile Renaming</h3>
+      <p><i>Assign clean labels without modifying browser preferences on disk.</i></p>
+      <img src="assets/screenshots/05_rename_profile.png" alt="Rename Profile" width="460" />
+    </td>
+    <td align="center" width="50%">
+      <h3>6. Custom & Portable Setups</h3>
+      <p><i>Add portable installations, custom directories, or Canary builds.</i></p>
+      <img src="assets/screenshots/06_custom_profile.png" alt="Custom Profiles" width="460" />
+    </td>
+  </tr>
+</table>
 
-### 1. Root Search Fast Routing
-*Type your query directly from Raycast Root Search with argument tab-completion.*
-<br/><br/>
-<img src="assets/screenshots/01_root_search.png" alt="Root Search Fast Routing" width="700" />
-<br/><br/>
-
-### 2. Intelligent Query & URL Auto-Detection
-*Instantly classifies bare domains, local development ports, and plain text search queries.*
-<br/><br/>
-<img src="assets/screenshots/02_query_routing.png" alt="Intelligent Query & URL Auto-Detection" width="700" />
-<br/><br/>
-
-### 3. Real-Time Profile & Account Filtering
-*Search across all installed browsers, Google profile pictures, and custom nicknames simultaneously.*
-<br/><br/>
-<img src="assets/screenshots/03_profile_filter.png" alt="Real-Time Profile Filtering" width="700" />
-<br/><br/>
-
-### 4. Power Action Panel & Shortcuts
-*Instant access to profile renaming, custom paths, link copying, and feedback reporting.*
-<br/><br/>
-<img src="assets/screenshots/04_action_panel.png" alt="Action Panel" width="700" />
-<br/><br/>
-
-### 5. In-Place Profile Renaming & Custom Nicknames
-*Assign clear labels like "Stripe Staging" or "Personal Gaming" without touching disk files.*
-<br/><br/>
-<img src="assets/screenshots/05_rename_profile.png" alt="Rename Profile" width="700" />
-<br/><br/>
-
-### 6. Custom & Portable Profile Support
-*Add arbitrary browser executables, portable installations, or Canary builds with custom arguments.*
-<br/><br/>
-<img src="assets/screenshots/06_custom_profile.png" alt="Custom Profile Support" width="700" />
-
-</div>
+<br />
 
 ---
 
-## Under The Hood: Engineering Deep Dive
+## How It Works (Architecture)
 
-Search Router is engineered from the ground up to overcome the unique constraints of the Windows desktop application model. Here is how the technical architecture works behind the scenes.
+Search Router is engineered specifically to overcome the constraints of Windows packaged desktop applications.
 
+```mermaid
+flowchart TD
+    subgraph Input ["1. User Input in Raycast"]
+        A[User Query or URL] --> B[Search Router Command]
+    end
+
+    subgraph Lexer ["2. Intelligent Lexer"]
+        B --> C{Input Type?}
+        C -->|Bare Domain / Localhost / URL| D[Format Web Protocol]
+        C -->|Search Query| E[Interpolate Engine Template]
+    end
+
+    subgraph Discovery ["3. Registry & Profile Resolver"]
+        D --> F[Locate Target Browser & User Data Dir]
+        E --> F
+        F --> G[Extract Profile Directory & Preferences]
+    end
+
+    subgraph Launcher ["4. Native Detachment Engine"]
+        G --> H["spawn(exe, args, { detached: true })"]
+        H --> I["child.unref()"]
+        I --> J[Browser Opens in Active User Session]
+    end
 ```
-+-----------------------------------------------------------------------------------+
-|                            Raycast Windows Desktop                                |
-|  [Root Search / Fallback] -> User enters query / URL -> [Search Router Command]   |
-+------------------------------------------+----------------------------------------+
-                                           |
-                                           v
-+-----------------------------------------------------------------------------------+
-|                        1. Fast Input Classification Lexer                         |
-|   - Protocol Check (https://, raycast://, file://)                                |
-|   - Local Dev Detection (localhost, 127.0.0.1, custom port bindings :3000)        |
-|   - Bare Domain TLD Parser (.com, .org, .dev, .ai, .io)                           |
-|   - Search Engine Template Interpolator (%s on Google, Brave, Kagi, Perplexity)  |
-+------------------------------------------+----------------------------------------+
-                                           |
-                                           v
-+-----------------------------------------------------------------------------------+
-|                     2. Dual-Layer Windows Registry Discovery                     |
-|   - Queries HKCU\Software\Clients\StartMenuInternet (Per-User Browsers)           |
-|   - Queries HKLM\Software\Clients\StartMenuInternet (Machine-Wide Browsers)       |
-|   - Resolves Canonical User Data Paths (%LOCALAPPDATA%\...\User Data)             |
-|   - Parses 'Local State' JSON & Profile 'Preferences' for names, avatars, emails  |
-+------------------------------------------+----------------------------------------+
-                                           |
-                                           v
-+-----------------------------------------------------------------------------------+
-|                   3. Native Process Detachment Spawning Engine                    |
-|   - Constructs: ["--user-data-dir=...", "--profile-directory=...", "targetUrl"]   |
-|   - Executes: child_process.spawn(exe, args, { detached: true, stdio: "ignore" }) |
-|   - Invokes: child.unref() (Escapes Raycast Job Object / Session ID 1 Handoff)    |
-|   - Raycast Command Closes in < 35ms -> 100% Authentic Active Session Restored   |
-+-----------------------------------------------------------------------------------+
-```
+
+<br />
 
 ### 1. Escaping the Windows Job Object Sandbox
 When an extension executes inside Raycast on Windows, child processes spawned via conventional APIs (`child_process.exec`, `open`, or `shell.openExternal`) inherit Raycast's parent process group and Windows Job Object boundaries.
 
-Because modern Chromium browsers enforce single-instance IPC checks and DPAPI master key encryption based on interactive user desktop security tokens, running inside an inherited job container causes Chromium to:
-- Fail to acquire write locks on profile SQLite databases (`Cookies`, `Web Data`, `Login Data`).
-- Silently drop the requested profile argument.
-- Fall back to an isolated, unauthenticated temporary session.
+Because modern Chromium browsers enforce single-instance IPC checks and DPAPI master key encryption based on interactive user desktop security tokens, running inside an inherited job container causes Chromium to fail to acquire write locks on profile SQLite databases (`Cookies`, `Web Data`, `Login Data`), opening a blank, unauthenticated session.
 
 **The Solution:**
-Search Router uses a dedicated low-level Libuv process detachment technique:
+Search Router uses low-level Libuv process detachment:
 ```typescript
 const child = spawn(browserExePath, launchArgs, {
   detached: true,
@@ -137,10 +205,12 @@ const child = spawn(browserExePath, launchArgs, {
 });
 child.unref();
 ```
-By setting `detached: true` alongside `stdio: "ignore"` and immediately calling `child.unref()`, Node invokes Windows `CreateProcessW` with process detachment flags. The operating system kernel immediately attaches the newly created browser process to the user's interactive Desktop session (Session ID 1), completely detached from Raycast's lifetime.
+`detached: true` instructs Windows' `CreateProcessW` API to detach from the parent job tree. `child.unref()` immediately removes the child from Node's event loop. The Windows kernel attaches the browser process directly to the user's interactive Desktop session (Session ID 1), ensuring 100% authentic login persistence.
 
-### 2. Chromium Multi-Argument Resolution (`--user-data-dir` + `--profile-directory`)
-Passing `--profile-directory="Profile 1"` alone is notoriously fragile on Windows. If Chromium is not already running, or if another instance was opened via a different shortcut, Chromium defaults to its default user data location and often ignores the directory flag.
+<br />
+
+### 2. Chromium Dual-Argument Directory Targeting
+Passing `--profile-directory="Profile 1"` alone is fragile on Windows. If Chromium is launched outside native shell associations, it defaults to the generic default user data root.
 
 Search Router dynamically detects and pairs the root user data directory with the profile folder:
 ```typescript
@@ -150,43 +220,46 @@ const launchArgs = [
   targetUrl,
 ];
 ```
-This guarantees 100% deterministic profile targeting across Google Chrome, Microsoft Edge, Brave Browser, Vivaldi, and Arc for Windows.
+This guarantees deterministic profile targeting across Chrome, Edge, Brave, Vivaldi, and Arc.
 
-### 3. Registry & Profile Metadata Harvesting
-Rather than hardcoding fragile filesystem paths (such as `C:\Program Files\Google\Chrome`), Search Router inspects both:
-- `HKCU\Software\Clients\StartMenuInternet` (Per-user installations)
-- `HKLM\Software\Clients\StartMenuInternet` (System-wide installations)
+<br />
 
-It reads the registered shell command, extracts the executable binary, and traverses to the application's user data directory. It then reads and parses:
-- **`Local State`**: Parses the JSON dictionary of profile metadata (`profile.info_cache`), extracting profile avatars, high-resolution badge icons, and Google/Microsoft account emails.
-- **`Preferences`**: Inspects profile-level settings for custom user nicknames and themes.
+### 3. Registry & Local State Metadata Discovery
+Rather than hardcoding filesystem paths, Search Router inspects both Windows Registry hives:
+* `HKCU\Software\Clients\StartMenuInternet` (Per-user installations)
+* `HKLM\Software\Clients\StartMenuInternet` (System-wide installations)
 
-### 4. Zero-Overhead Input Lexer
-Search Router includes an instantaneous regex-free tokenizer that determines whether user input is an explicit destination or a search query:
-- **Full URLs**: Matches valid URL schemas (`http://`, `https://`, `ftp://`, `file://`, `raycast://`).
-- **Localhost & Dev Servers**: Matches `localhost`, `127.0.0.1`, `::1`, and port bindings (e.g. `localhost:3000`, `127.0.0.1:8080`).
-- **Bare Domains**: Identifies valid top-level domains (`.com`, `.org`, `.dev`, `.ai`, `.io`, `.app`, etc.) and automatically normalizes them with `https://`.
-- **Search Query Interpolation**: Cleanly URL-encodes multi-word queries into your chosen engine template (Google, DuckDuckGo, Brave Search, Bing, Perplexity, Ecosia, or any custom URL like `https://kagi.com/search?q=%s`).
+It reads the registered shell command, extracts the executable binary, and parses:
+* **`Local State`**: Extracts profile avatars, high-resolution badge icons, and Google/Microsoft account emails.
+* **`Preferences`**: Inspects profile-level settings for custom user nicknames.
 
-### 5. Dynamic SVG Composite Icon Badging
-To make profile identification instantaneous at a glance, Search Router dynamically synthesizes high-DPI composite icons using SVG data URIs, layering the authentic browser brand icon with the individual user's profile picture or account avatar.
+<br />
 
-### 6. Serverless Discord Feedback Pipeline (Cloudflare Workers)
-To allow users to report bugs or request features without leaking Discord webhook credentials in client code:
-- Search Router connects to an edge-hosted Cloudflare Worker (`search-router-feedback.kanha01945.workers.dev`).
-- The worker holds encrypted Discord webhook secrets in edge memory, validates incoming JSON payloads, and dispatches rich Discord embeds directly into community triage channels.
-- **Draft Resilience**: Feedback drafts are persisted in local Raycast `LocalStorage` with a 15-minute auto-expiry window, ensuring users never lose typed feedback if they switch windows.
+### 4. Zero-Overhead URL & Query Classification
+An instantaneous regex-free tokenizer classifies user input in real time:
+* **Full URLs**: Matches valid schemas (`https://`, `http://`, `raycast://`, `file://`).
+* **Localhost & Ports**: Matches `localhost`, `127.0.0.1`, `::1`, and custom port bindings (`:3000`, `:8080`).
+* **Bare Domains**: Identifies valid top-level domains (`.com`, `.dev`, `.ai`, `.org`, etc.) and automatically prepends `https://`.
+* **Search Queries**: Cleanly URL-encodes multi-word queries into your chosen engine template.
+
+<br />
 
 ---
 
-## Features at a Glance
+## Supported Browsers
 
-- ⚡ **Sub-35ms Launch Time**: Detached process spawning ensures instantaneous command execution with zero background memory footprint.
-- 🎯 **Dual-Mode Input**: Supports Raycast Root Search argument passing (<kbd>Tab</kbd>) and direct Fallback Command integration.
-- 🔍 **Universal Browser Detection**: Automatic discovery for **Google Chrome**, **Microsoft Edge**, **Brave Browser**, **Vivaldi**, **Arc for Windows**, **Mozilla Firefox**, and **Opera / Opera GX**.
-- 🏷️ **Custom Profile Names & Portable Setups**: Rename any profile locally in Raycast or point to custom/portable browser binaries.
-- 🎨 **Configurable Search Engines**: Switch between Google, DuckDuckGo, Brave Search, Bing, Perplexity, Ecosia, or your own custom search template.
-- 🔒 **100% Offline & Private**: Zero analytics, zero telemetry, zero tracking. All profile detection is strictly local.
+| Browser | Auto-Discovery | Multi-Profile | Custom Avatars | Windows Support |
+| :--- | :---: | :---: | :---: | :---: |
+| **Google Chrome** | ✅ | ✅ | ✅ | Win 10 / 11 |
+| **Microsoft Edge** | ✅ | ✅ | ✅ | Win 10 / 11 |
+| **Brave Browser** | ✅ | ✅ | ✅ | Win 10 / 11 |
+| **Vivaldi** | ✅ | ✅ | ✅ | Win 10 / 11 |
+| **Arc for Windows** | ✅ | ✅ | ✅ | Win 11 |
+| **Mozilla Firefox** | ✅ | ✅ | ❌ | Win 10 / 11 |
+| **Opera & Opera GX** | ✅ | ⚠️ | ❌ | Win 10 / 11 |
+| **Custom / Portable** | ✅ | ✅ | ✅ | Win 10 / 11 |
+
+<br />
 
 ---
 
@@ -194,7 +267,7 @@ To allow users to report bugs or request features without leaking Discord webhoo
 
 | Shortcut | Action | Scope |
 | :--- | :--- | :--- |
-| <kbd>↵ Enter</kbd> | **Launch URL / Query in Selected Profile** | Profile List |
+| <kbd>↵ Enter</kbd> | **Launch in Selected Browser & Profile** | Profile List |
 | <kbd>Tab</kbd> | **Focus Search Argument from Root Search** | Raycast Root |
 | <kbd>Ctrl</kbd> + <kbd>H</kbd> | **Open Quick Start / User Manual** | Global |
 | <kbd>Ctrl</kbd> + <kbd>R</kbd> | **Rename Profile (Local Nickname)** | Profile Item |
@@ -202,73 +275,19 @@ To allow users to report bugs or request features without leaking Discord webhoo
 | <kbd>Ctrl</kbd> + <kbd>A</kbd> | **Add Custom Profile / Portable Directory** | Profile List |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd> | **Delete Custom Profile** | Custom Item |
 | <kbd>Ctrl</kbd> + <kbd>F</kbd> | **Send Feedback / Report Bug** | Global |
-| <kbd>Ctrl</kbd> + <kbd>C</kbd> | **Copy Target URL to Clipboard** | Profile Item |
+| <kbd>Ctrl</kbd> + <kbd>C</kbd> | **Copy Target Destination URL** | Profile Item |
 | <kbd>Ctrl</kbd> + <kbd>,</kbd> | **Open Extension Preferences** | Global |
 
----
-
-## Technical Specifications & Benchmarks
-
-| Metric | Measurement / Specification |
-| :--- | :--- |
-| **Launch Latency** | `< 35ms` (Libuv unreferenced process handoff) |
-| **Active Memory Footprint** | `0 MB` (Process terminates immediately after launch) |
-| **Background Daemons** | `None` (Zero scheduled tasks, zero background watchers) |
-| **Telemetry & Tracking** | `Zero` (No analytics, 100% on-device operation) |
-| **Registry Access** | Read-only inspection of standard `StartMenuInternet` keys |
-| **Supported OS** | Windows 10 & Windows 11 (64-bit / ARM64) |
-| **Package Validation** | Fully compliant with official Raycast Extension Store standards |
+<br />
 
 ---
 
-## Project Structure
+## Getting Started
 
-```
-search-router/
-├── .github/                       # GitHub issue templates & PR guidelines
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.md
-│   │   └── feature_request.md
-│   └── PULL_REQUEST_TEMPLATE.md
-├── assets/                        # Extension icons & showcase screenshots
-│   ├── extension-icon.png         # 512x512 Master Extension Icon
-│   └── screenshots/               # High-res showcase captures
-├── metadata/                      # Raycast Store submission assets (2000x1250)
-├── src/
-│   ├── components/                # React UI Views
-│   │   ├── AddCustomProfileForm.tsx
-│   │   ├── FeedbackForm.tsx
-│   │   ├── RenameProfileForm.tsx
-│   │   └── UserManualView.tsx
-│   ├── config/                    # Endpoint & feedback configurations
-│   │   └── feedbackConfig.ts
-│   ├── utils/                     # Core system utilities
-│   │   ├── browserDetector.ts     # Windows Registry & Local State reader
-│   │   ├── iconBadgeHelper.ts     # High-DPI composite SVG badging
-│   │   ├── launcher.ts            # Detached process spawning engine
-│   │   ├── storage.ts             # Raycast LocalStorage persistence
-│   │   └── urlHelper.ts           # Lexer & search engine interpolator
-│   ├── search-router.tsx          # Main extension entrypoint
-│   └── types.ts                   # TypeScript interfaces & types
-├── CONTRIBUTING.md                # Developer setup & PR instructions
-├── LICENSE                        # MIT License
-├── package.json                   # Raycast manifest & scripts
-├── PRIVACY.md                     # Privacy guarantees & data statement
-├── README.md                      # Project documentation
-├── SECURITY.md                    # Vulnerability reporting policy
-└── tsconfig.json                  # TypeScript configuration
-```
-
----
-
-## Installation & Development
-
-### From the Raycast Store
+### Installation via Raycast Store
 Search for **Search Router** in the Raycast Store and click **Install Extension**.
 
 ### Local Development Setup
-If you want to build or customize Search Router on your Windows machine:
-
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/raghavg02/search-router.git
@@ -280,11 +299,10 @@ If you want to build or customize Search Router on your Windows machine:
    npm install
    ```
 
-3. **Start development mode:**
+3. **Start developer mode:**
    ```bash
    npm run dev
    ```
-   Raycast will detect the local extension and hot-reload changes as you edit code.
 
 4. **Verify quality & linting:**
    ```bash
@@ -293,19 +311,23 @@ If you want to build or customize Search Router on your Windows machine:
    npm run build       # Creates production bundle
    ```
 
+<br />
+
 ---
 
-## Privacy & Telemetry Guarantee
+## Privacy & Security
 
-Search Router respects user privacy unconditionally:
-- **No Browsing Data Access**: Search Router never accesses browser history, cookies, stored passwords, or session tokens.
-- **No Background Network Calls**: The extension functions completely offline. The only network request occurs if you explicitly choose to submit in-app feedback via <kbd>Ctrl</kbd> + <kbd>F</kbd>.
-- Read our full [Privacy Policy](PRIVACY.md) and [Security Policy](SECURITY.md).
+* **Zero Telemetry**: Search Router collects no telemetry, metrics, or analytics.
+* **No Access to Sensitive Data**: Never accesses browsing history, saved passwords, cookies, or DPAPI master keys.
+* **100% On-Device Operation**: All detection and routing occur strictly on your local PC.
+* Read our full [Privacy Policy](PRIVACY.md) and [Security Policy](SECURITY.md).
+
+<br />
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 Copyright (c) 2026 **Raghav Gupta**. All rights reserved.
