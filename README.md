@@ -271,7 +271,7 @@ If you want to build or customize Search Router on your Windows machine:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/kanha01945/search-router.git
+   git clone https://github.com/raghavg02/search-router.git
    cd search-router
    ```
 
@@ -308,4 +308,4 @@ Search Router respects user privacy unconditionally:
 
 This project is licensed under the [MIT License](LICENSE).
 
-Copyright (c) 2026 **Kanha Gupta**. All rights reserved.
+Copyright (c) 2026 **Raghav Gupta**. All rights reserved.

@@ -160,7 +160,7 @@ We provide two seamless submission options:
 
   * When submitted, Raycast constructs an encoded GitHub Issue URL:
 
-    `https://github.com/kanha01945/search-router/issues/new?title=[Category]...&body=...`
+    `https://github.com/raghavg02/search-router/issues/new?title=[Category]...&body=...`
 
   * Automatically opens the browser to your repository's issues page with title, body, and labels already filled in!
 

@@ -4,7 +4,7 @@
   "title": "Search Router",
   "description": "Route search queries and URLs to any installed browser and profile on Windows.",
   "icon": "extension-icon.png",
-  "author": "kanha_gupta",
+  "author": "raghavg02",
   "platforms": [
     "Windows"
   ],
