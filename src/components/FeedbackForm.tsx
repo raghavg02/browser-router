@@ -32,38 +32,51 @@ export function FeedbackForm() {
       ? "e.g. Shortcut customization, UI layout proposal..."
       : "e.g. Add Zen Browser support, or Brave profile launch issue...";
 
-  async function handleSubmit() {
+  interface FormValues {
+    category?: string;
+    customCategory?: string;
+    title?: string;
+    description?: string;
+    email?: string;
+  }
+
+  async function handleSubmit(values?: FormValues) {
+    const selectedCategory = values?.category || category;
+    const selectedCustomCategory = values?.customCategory || customCategory;
+    const enteredTitle = values?.title || title;
+    const enteredDescription = values?.description || description;
+    const enteredEmail = values?.email || email;
     let hasError = false;
 
-    if (!category) {
+    if (!selectedCategory) {
       setCategoryError("Please select a feedback category");
       hasError = true;
     } else {
       setCategoryError(undefined);
     }
 
-    if (category === "other" && !customCategory.trim()) {
+    if (selectedCategory === "other" && !selectedCustomCategory.trim()) {
       setCustomCategoryError("Please specify the category");
       hasError = true;
     } else {
       setCustomCategoryError(undefined);
     }
 
-    if (!title.trim()) {
+    if (!enteredTitle.trim()) {
       setTitleError("Title is required");
       hasError = true;
     } else {
       setTitleError(undefined);
     }
 
-    if (!description.trim()) {
+    if (!enteredDescription.trim()) {
       setDescriptionError("Details are required");
       hasError = true;
     } else {
       setDescriptionError(undefined);
     }
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = enteredEmail.trim();
     if (!trimmedEmail) {
       setEmailError("Email is required");
       hasError = true;
@@ -88,42 +101,43 @@ export function FeedbackForm() {
     let categoryPrefix = "💬 [GENERAL FEEDBACK]";
     let embedColor = 3900150; // Blue
 
-    if (category === "bug") {
+    if (selectedCategory === "bug") {
       categoryDisplay = "🚨 Bug Report / Complaint";
       categoryPrefix = "🚨 [COMPLAINT]";
       embedColor = 14689316; // Red (#E02424)
-    } else if (category === "feature") {
+    } else if (selectedCategory === "feature") {
       categoryDisplay = "✨ Feature Request / Future Update";
       categoryPrefix = "✨ [FEATURE REQUEST]";
       embedColor = 16096779; // Gold/Yellow (#F59E0B)
-    } else if (category === "other") {
-      const typeName = customCategory.trim() || "Other";
+    } else if (selectedCategory === "other") {
+      const typeName = selectedCustomCategory.trim() || "Other";
       categoryDisplay = `🧩 Other (${typeName})`;
       categoryPrefix = `🧩 [${typeName.toUpperCase()}]`;
       embedColor = 9133302; // Purple (#8B5CF6)
     }
 
     const embed = {
-      title: `${categoryPrefix} ${title.trim()}`,
+      title: `${categoryPrefix} ${enteredTitle.trim()}`,
       color: embedColor,
       fields: [
         { name: "👤 Submitter Email", value: trimmedEmail, inline: true },
         { name: "🏷️ Category", value: categoryDisplay, inline: true },
         { name: "💻 System Info", value: `Windows (${process.arch}) • Search Router v2.0`, inline: true },
-        { name: "📝 Details", value: description.trim() },
+        { name: "📝 Details", value: enteredDescription.trim() },
         { name: "📌 Status", value: "⏳ New / Awaiting Review", inline: true },
       ],
       footer: { text: "Search Router User Feedback" },
       timestamp: new Date().toISOString(),
     };
 
+        console.log("[FeedbackForm] Sending payload to Cloudflare:", { category: selectedCategory, title: enteredTitle.trim(), email: trimmedEmail });
     if (FEEDBACK_WORKER_URL && FEEDBACK_WORKER_URL.trim().startsWith("https://")) {
       try {
         const response = await fetch(FEEDBACK_WORKER_URL.trim(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            category,
+            category: selectedCategory,
             embed,
           }),
         });
