@@ -196,11 +196,6 @@ export function FeedbackForm() {
       timestamp: new Date().toISOString(),
     };
 
-    console.log("[FeedbackForm] Sending payload to Cloudflare:", {
-      category: selectedCategory,
-      title: enteredTitle.trim(),
-      email: trimmedEmail,
-    });
     if (FEEDBACK_WORKER_URL && FEEDBACK_WORKER_URL.trim().startsWith("https://")) {
       try {
         const response = await fetch(FEEDBACK_WORKER_URL.trim(), {

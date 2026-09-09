@@ -1,6 +1,6 @@
 ﻿---
 name: Bug report
-about: Create a report to help us improve Search Router
+about: Create a report to help us improve Browser Router
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -24,7 +24,7 @@ A clear and concise description of what you expected to happen.
  - Raycast Version:
  - Affected Browser(s) (Chrome, Edge, Brave, Vivaldi, Arc, Firefox, Opera):
  - Browser Version(s):
- - Search Router Version: 1.0.0
+ - Browser Router Version: 1.0.0
 
 **Additional context**
 Add any other context or screenshots about the problem here.

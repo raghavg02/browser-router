@@ -1,6 +1,6 @@
 ﻿---
 name: Feature request
-about: Suggest an idea or new browser support for Search Router
+about: Suggest an idea or new browser support for Browser Router
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
