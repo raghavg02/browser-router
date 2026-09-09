@@ -20,6 +20,18 @@ export function FeedbackForm() {
   const [emailError, setEmailError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Dynamic, context-aware title placeholders that adapt to the selected category
+  const titlePlaceholder =
+    category === "bug"
+      ? "e.g. Brave profile not loading logins, Edge inprivate shortcut..."
+      : category === "feature"
+      ? "e.g. Auto-detect Zen Browser, custom URL query presets..."
+      : category === "general"
+      ? "e.g. Loving the dual-mode search, quick idea on list layout..."
+      : category === "other"
+      ? "e.g. Shortcut customization, UI layout proposal..."
+      : "e.g. Add Zen Browser support, or Brave profile launch issue...";
+
   async function handleSubmit() {
     let hasError = false;
 
@@ -158,7 +170,7 @@ export function FeedbackForm() {
 
       <Form.Dropdown
         id="category"
-        title="Feedback Category"
+        title="Category"
         value={category}
         onChange={(val) => {
           setCategory(val);
@@ -177,7 +189,7 @@ export function FeedbackForm() {
         <Form.TextField
           id="customCategory"
           title="Specify Category"
-          placeholder="Enter category name..."
+          placeholder="e.g. Performance, Translation, Shortcut idea..."
           value={customCategory}
           onChange={(val) => {
             setCustomCategory(val);
@@ -189,8 +201,8 @@ export function FeedbackForm() {
 
       <Form.TextField
         id="title"
-        title="Title / Summary"
-        placeholder="Enter title / summary..."
+        title="Title"
+        placeholder={titlePlaceholder}
         value={title}
         onChange={(val) => {
           setTitle(val);
@@ -201,8 +213,8 @@ export function FeedbackForm() {
 
       <Form.TextArea
         id="description"
-        title="Details / Message"
-        placeholder="Enter details / message..."
+        title="Details"
+        placeholder="Describe your idea, complaint, or issue with as much detail as possible..."
         value={description}
         onChange={(val) => {
           setDescription(val);
@@ -210,6 +222,8 @@ export function FeedbackForm() {
         }}
         error={descriptionError}
       />
+
+      <Form.Separator />
 
       <Form.TextField
         id="email"
