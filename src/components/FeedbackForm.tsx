@@ -1,8 +1,10 @@
-import { Form, ActionPanel, Action, useNavigation, showToast, Toast, Icon } from "@raycast/api";
-import { useState } from "react";
+import { Form, ActionPanel, Action, useNavigation, showToast, Toast, Icon, LocalStorage } from "@raycast/api";
+import { useState, useEffect, useRef } from "react";
 import { FEEDBACK_WORKER_URL } from "../config/feedbackConfig";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const FEEDBACK_DRAFT_KEY = "feedback_form_draft";
+const DRAFT_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 export function FeedbackForm() {
   const { pop } = useNavigation();
@@ -19,6 +21,67 @@ export function FeedbackForm() {
   const [descriptionError, setDescriptionError] = useState<string | undefined>();
   const [emailError, setEmailError] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isLoadedRef = useRef(false);
+
+  // Restore draft if saved within the last 15 minutes
+  useEffect(() => {
+    async function restoreDraft() {
+      try {
+        const raw = await LocalStorage.getItem<string>(FEEDBACK_DRAFT_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw);
+          const age = Date.now() - (draft.savedAt || 0);
+          if (age < DRAFT_EXPIRY_MS) {
+            if (draft.category) setCategory(draft.category);
+            if (draft.customCategory) setCustomCategory(draft.customCategory);
+            if (draft.title) setTitle(draft.title);
+            if (draft.description) setDescription(draft.description);
+            if (draft.email) setEmail(draft.email);
+          } else {
+            await LocalStorage.removeItem(FEEDBACK_DRAFT_KEY);
+          }
+        }
+      } catch {
+        // ignore parse error
+      } finally {
+        isLoadedRef.current = true;
+      }
+    }
+    restoreDraft();
+  }, []);
+
+  // Persist draft to LocalStorage with timestamp (debounced on state change)
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+    if (category || customCategory || title || description || email) {
+      LocalStorage.setItem(
+        FEEDBACK_DRAFT_KEY,
+        JSON.stringify({
+          category,
+          customCategory,
+          title,
+          description,
+          email,
+          savedAt: Date.now(),
+        })
+      );
+    }
+  }, [category, customCategory, title, description, email]);
+
+  async function handleClearDraft() {
+    await LocalStorage.removeItem(FEEDBACK_DRAFT_KEY);
+    setCategory("");
+    setCustomCategory("");
+    setTitle("");
+    setDescription("");
+    setEmail("");
+    setCategoryError(undefined);
+    setCustomCategoryError(undefined);
+    setTitleError(undefined);
+    setDescriptionError(undefined);
+    setEmailError(undefined);
+    await showToast({ style: Toast.Style.Success, title: "Draft Cleared" });
+  }
 
   // Dynamic, context-aware title placeholders that adapt to the selected category
   const titlePlaceholder =
@@ -129,7 +192,7 @@ export function FeedbackForm() {
       description: enteredDescription.trim(),
       color: embedColor,
       fields,
-      footer: { text: "Search Router v2.0" },
+      footer: { text: "Search Router v1.0" },
       timestamp: new Date().toISOString(),
     };
 
@@ -146,6 +209,7 @@ export function FeedbackForm() {
         });
 
         if (response.ok) {
+          await LocalStorage.removeItem(FEEDBACK_DRAFT_KEY);
           toast.style = Toast.Style.Success;
           toast.title = "Feedback Sent!";
           toast.message = "Thank you! We have received your feedback.";
@@ -188,6 +252,13 @@ export function FeedbackForm() {
             title="Submit Feedback"
             icon={Icon.Envelope}
             onSubmit={handleSubmit}
+          />
+          <Action
+            title="Clear Draft"
+            icon={Icon.Trash}
+            style={Action.Style.Destructive}
+            shortcut={{ modifiers: ["ctrl", "shift"], key: "backspace" }}
+            onAction={handleClearDraft}
           />
         </ActionPanel>
       }
