@@ -10,6 +10,7 @@ import {
   Toast,
   Keyboard,
   openExtensionPreferences,
+  LocalStorage,
 } from "@raycast/api";
 import { useEffect, useState, useMemo } from "react";
 import { BrowserProfile, ExtensionPreferences } from "./types";
@@ -20,6 +21,7 @@ import { toggleFavorite, removeCustomProfile } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
 import { RenameProfileForm } from "./components/RenameProfileForm";
 import { FeedbackForm } from "./components/FeedbackForm";
+import { UserManualView } from "./components/UserManualView";
 
 export default function Command(props: LaunchProps<{ arguments: { query?: string }; fallbackText?: string }>) {
   const preferences = getPreferenceValues<ExtensionPreferences>();
@@ -33,6 +35,21 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   // Preserved state for both modes
   const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
   const [filterText, setFilterText] = useState<string>("");
+
+  const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkFirstRun() {
+      const seen = await LocalStorage.getItem<boolean>("hasSeenUserManual");
+      setHasSeenManual(!!seen);
+    }
+    checkFirstRun();
+  }, []);
+
+  async function handleDismissFirstRun() {
+    await LocalStorage.setItem("hasSeenUserManual", true);
+    setHasSeenManual(true);
+  }
 
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -204,6 +221,12 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
             <ActionPanel.Section title="Help & Feedback">
               <Action.Push
+                title="User Manual & Guide"
+                icon={Icon.Book}
+                shortcut={{ modifiers: ["ctrl"], key: "h" }}
+                target={<UserManualView />}
+              />
+              <Action.Push
                 title="Send Feedback / Feature Request"
                 icon={Icon.Envelope}
                 shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
@@ -241,6 +264,10 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       : searchQuery.trim()
         ? `Routing query: "${searchQuery}"`
         : "Filter Profiles";
+
+  if (hasSeenManual === false) {
+    return <UserManualView isFirstRun={true} onDismissFirstRun={handleDismissFirstRun} />;
+  }
 
   return (
     <List
