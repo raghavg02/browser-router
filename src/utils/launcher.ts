@@ -5,27 +5,6 @@ import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
 
-function getWindowsShellHelperPath(): string {
-  const vbsPath = path.join(os.tmpdir(), "search_router_launch.vbs");
-  if (!fs.existsSync(vbsPath)) {
-    fs.writeFileSync(
-      vbsPath,
-      'Set s=CreateObject("Shell.Application")\n' +
-        'args=""\n' +
-        'cwd=""\n' +
-        "If WScript.Arguments.Count > 1 Then\n" +
-        "  args = WScript.Arguments(1)\n" +
-        "End If\n" +
-        "If WScript.Arguments.Count > 2 Then\n" +
-        "  cwd = WScript.Arguments(2)\n" +
-        "End If\n" +
-        's.ShellExecute WScript.Arguments(0), args, cwd, "open", 1\n',
-      "utf8",
-    );
-  }
-  return vbsPath;
-}
-
 export async function launchBrowserProfile(
   profile: BrowserProfile,
   targetUrl?: string,
@@ -42,89 +21,90 @@ export async function launchBrowserProfile(
     }
 
     const exeDir = path.dirname(profile.executablePath);
-    const argsParts: string[] = [];
+    const args: string[] = [];
 
     if (profile.browserId === "firefox") {
       if (incognito) {
-        argsParts.push("-private-window");
+        args.push("-private-window");
       }
       if (profile.profileDirectory && profile.profileDirectory !== "default") {
-        argsParts.push("-P", `"${profile.profileDirectory}"`);
+        args.push("-P", profile.profileDirectory);
       }
       if (targetUrl) {
-        argsParts.push(`"${targetUrl}"`);
+        args.push(targetUrl);
       }
     } else {
       // Chromium browsers (Chrome, Edge, Brave, Vivaldi, Arc, Opera, etc.)
       if (incognito) {
         if (profile.browserId === "edge") {
-          argsParts.push("--inprivate");
+          args.push("--inprivate");
         } else {
-          argsParts.push("--incognito");
+          args.push("--incognito");
+        }
+      }
+
+      // For Brave, Vivaldi, Arc, Opera, and custom browsers:
+      // Raycast runs as an MSIX packaged app on Windows, which can redirect CSIDL_LOCALAPPDATA to AppData\Local\Temp
+      // when child processes are spawned without explicit paths. This caused cold-started browsers to boot into empty,
+      // unauthenticated Temp profiles instead of the real user profile.
+      // Explicitly passing --user-data-dir overrides this and forces Chromium to use the real profile on disk!
+      // (Note: Do not pass --user-data-dir for Chrome and Edge when they are running with background tasks,
+      // to avoid exit code 21 profile lock contention).
+      if (
+        profile.browserId === "brave" ||
+        profile.browserId === "vivaldi" ||
+        profile.browserId === "arc" ||
+        profile.browserId === "opera" ||
+        profile.isCustom
+      ) {
+        let udd = profile.userDataDir;
+        if (!udd && process.platform === "win32") {
+          const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+          const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+          if (profile.browserId === "brave") {
+            udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
+          } else if (profile.browserId === "vivaldi") {
+            udd = path.join(localAppData, "Vivaldi", "User Data");
+          } else if (profile.browserId === "arc") {
+            udd = path.join(localAppData, "Arc", "User Data");
+          } else if (profile.browserId === "opera") {
+            udd = path.join(appData, "Opera Software", "Opera Stable");
+          }
+        }
+        if (udd) {
+          args.push(`--user-data-dir=${udd}`);
         }
       }
 
       if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
-        if (profile.profileDirectory.includes(" ")) {
-          argsParts.push(`--profile-directory="${profile.profileDirectory}"`);
-        } else {
-          argsParts.push(`--profile-directory=${profile.profileDirectory}`);
-        }
+        args.push(`--profile-directory=${profile.profileDirectory}`);
       }
 
       if (targetUrl) {
-        argsParts.push(`"${targetUrl}"`);
+        args.push(targetUrl);
       }
     }
 
-    if (process.platform === "win32") {
-      // On Windows, Raycast runs as an MSIX packaged app (WindowsApps).
-      // Child processes spawned directly via Node inside an MSIX container inherit the MSIX
-      // package identity, which causes Windows to virtualize %LOCALAPPDATA% into %LOCALAPPDATA%\\Temp
-      // and restricts DPAPI encryption keys. This caused cold-started browsers (Brave and Vivaldi)
-      // to open into an unauthenticated, isolated "Temp" profile instead of the real user profile.
-      //
-      // Calling Windows Desktop Shell (Shell.Application.ShellExecute via wscript) delegates the launch
-      // to explorer.exe (the Windows interactive desktop shell). This launches the browser as a true
-      // top-level desktop process in the active desktop session with full access to the real %LOCALAPPDATA%
-      // and all authenticated logins, sessions, and cookies.
-      const helperPath = getWindowsShellHelperPath();
-      const argsString = argsParts.join(" ");
+    // Direct process spawn using Node standard libuv command line formatting.
+    // NOTE: Never use windowsVerbatimArguments: true on Windows!
+    // With standard spawn, Node automatically quotes executable paths and arguments with spaces safely,
+    // preventing Chrome and Edge from opening bogus http://files/... or [(x86)] tabs.
+    const child = spawn(profile.executablePath, args, {
+      detached: true,
+      stdio: "ignore",
+      cwd: fs.existsSync(exeDir) ? exeDir : undefined,
+      env: process.env,
+    });
 
-      const child = spawn("wscript.exe", [helperPath, profile.executablePath, argsString, exeDir || ""], {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: true,
+    child.on("error", async (err) => {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to launch browser",
+        message: err.message,
       });
+    });
 
-      child.on("error", async (err) => {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Failed to launch browser",
-          message: err.message,
-        });
-      });
-
-      child.unref();
-    } else {
-      // macOS / Linux standard spawn
-      const child = spawn(profile.executablePath, argsParts, {
-        detached: true,
-        stdio: "ignore",
-        cwd: fs.existsSync(exeDir) ? exeDir : undefined,
-        env: process.env,
-      });
-
-      child.on("error", async (err) => {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Failed to launch browser",
-          message: err.message,
-        });
-      });
-
-      child.unref();
-    }
+    child.unref();
 
     const modeText = incognito ? " (Incognito)" : "";
     await showToast({

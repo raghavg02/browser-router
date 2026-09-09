@@ -281,6 +281,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
             displayName: customName || `${config.name} — ${rawName}`,
             profileDirectory: profileDir,
             executablePath: exe,
+            userDataDir: config.userDir,
             iconPath: logoIcon,
             avatarPath,
             fallbackIcon: config.fallbackIcon,
@@ -303,6 +304,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
         displayName: customName || `${config.name} — Default`,
         profileDirectory: "Default",
         executablePath: exe,
+        userDataDir: config.userDir,
         iconPath: logoIcon,
         fallbackIcon: config.fallbackIcon,
       });
@@ -389,6 +391,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
       displayName: customName || `${cp.browserName} — ${cp.profileName}`,
       profileDirectory: cp.profileDirectory,
       executablePath: cp.executablePath,
+      userDataDir: cp.userDataDir,
       iconPath: logoIcon,
       fallbackIcon: "extension-icon.png",
       isCustom: true,

@@ -6,6 +6,7 @@ export interface BrowserProfile {
   displayName: string;
   profileDirectory: string;
   executablePath: string;
+  userDataDir?: string;
   iconPath?: string;
   avatarPath?: string;
   fallbackIcon: string;
@@ -26,4 +27,5 @@ export interface CustomProfileData {
   executablePath: string;
   profileDirectory: string;
   browserId?: string;
+  userDataDir?: string;
 }
