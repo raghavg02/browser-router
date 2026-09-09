@@ -31,7 +31,7 @@ export function FeedbackForm() {
     }
 
     if (category === "other" && !customCategory.trim()) {
-      setCustomCategoryError("Please tell us your feedback type");
+      setCustomCategoryError("Please specify the category");
       hasError = true;
     } else {
       setCustomCategoryError(undefined);
@@ -53,10 +53,10 @@ export function FeedbackForm() {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setEmailError("Email is required so we can notify you");
+      setEmailError("Email is required");
       hasError = true;
     } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      setEmailError("Please enter a valid email address (e.g. name@example.com)");
+      setEmailError("Please enter a valid email address");
       hasError = true;
     } else {
       setEmailError(undefined);
@@ -118,7 +118,7 @@ export function FeedbackForm() {
         if (response.ok) {
           toast.style = Toast.Style.Success;
           toast.title = "Feedback Sent!";
-          toast.message = "Thank you! We will notify you by email as soon as it is reviewed.";
+          toast.message = "Thank you! We have received your feedback.";
           pop();
         } else {
           toast.style = Toast.Style.Failure;
@@ -133,7 +133,6 @@ export function FeedbackForm() {
         setIsSubmitting(false);
       }
     } else {
-      // If webhook is not configured yet, record success and provide helpful instructions
       toast.style = Toast.Style.Success;
       toast.title = "Feedback Validated!";
       toast.message = "Form is ready. Configure your Discord Webhook in src/config/feedbackConfig.ts to receive alerts.";
@@ -155,7 +154,7 @@ export function FeedbackForm() {
       }
       isLoading={isSubmitting}
     >
-      <Form.Description text="Have a complaint, idea, or request? Send it directly to our team! We will email you when your request is reviewed and when it goes live." />
+      <Form.Description text="Have a complaint, idea, or request? Send it directly to our team!" />
 
       <Form.Dropdown
         id="category"
@@ -168,18 +167,17 @@ export function FeedbackForm() {
         error={categoryError}
       >
         <Form.Dropdown.Item value="" title="Select Feedback Category..." icon={Icon.QuestionMark} />
-        <Form.Dropdown.Item value="bug" title="🚨 Bug Report / Complaint" icon={Icon.ExclamationMark} />
-        <Form.Dropdown.Item value="feature" title="✨ Feature Request / Future Update" icon={Icon.Stars} />
-        <Form.Dropdown.Item value="general" title="💬 General Feedback" icon={Icon.Message} />
-        <Form.Dropdown.Item value="other" title="🧩 Other" icon={Icon.Tag} />
+        <Form.Dropdown.Item value="bug" title="Bug Report / Complaint" icon={Icon.ExclamationMark} />
+        <Form.Dropdown.Item value="feature" title="Feature Request / Future Update" icon={Icon.Stars} />
+        <Form.Dropdown.Item value="general" title="General Feedback" icon={Icon.Message} />
+        <Form.Dropdown.Item value="other" title="Other" icon={Icon.Tag} />
       </Form.Dropdown>
 
       {category === "other" && (
         <Form.TextField
           id="customCategory"
           title="Specify Category"
-          placeholder="e.g. Performance, Translation, Shortcut idea"
-          info="Tell us your custom feedback type"
+          placeholder="Enter category name..."
           value={customCategory}
           onChange={(val) => {
             setCustomCategory(val);
@@ -192,7 +190,7 @@ export function FeedbackForm() {
       <Form.TextField
         id="title"
         title="Title / Summary"
-        placeholder="e.g. Add auto-detection for Zen Browser"
+        placeholder="Enter title / summary..."
         value={title}
         onChange={(val) => {
           setTitle(val);
@@ -204,7 +202,7 @@ export function FeedbackForm() {
       <Form.TextArea
         id="description"
         title="Details / Message"
-        placeholder="Describe your idea, complaint, or issue with as much detail as possible..."
+        placeholder="Enter details / message..."
         value={description}
         onChange={(val) => {
           setDescription(val);
@@ -217,7 +215,6 @@ export function FeedbackForm() {
         id="email"
         title="Your Email"
         placeholder="your.email@example.com"
-        info="Required so we can notify you when your request is received and when the feature/fix goes live!"
         value={email}
         onChange={(val) => {
           setEmail(val);
