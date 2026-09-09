@@ -97,40 +97,43 @@ export function FeedbackForm() {
 
     // Webhook URL is routed securely through Cloudflare Worker relay
 
-    let categoryDisplay = "General Feedback";
-    let categoryPrefix = "💬 [GENERAL FEEDBACK]";
-    let embedColor = 3900150; // Blue
+    let categoryAuthor = "💬 GENERAL FEEDBACK";
+    let embedColor = 3900150; // Electric Sky Blue (#3B82F6)
 
     if (selectedCategory === "bug") {
-      categoryDisplay = "🚨 Bug Report / Complaint";
-      categoryPrefix = "🚨 [COMPLAINT]";
-      embedColor = 14689316; // Red (#E02424)
+      categoryAuthor = "🚨 BUG REPORT";
+      embedColor = 15680324; // Crimson Red (#EF4444)
     } else if (selectedCategory === "feature") {
-      categoryDisplay = "✨ Feature Request / Future Update";
-      categoryPrefix = "✨ [FEATURE REQUEST]";
-      embedColor = 16096779; // Gold/Yellow (#F59E0B)
+      categoryAuthor = "✨ FEATURE REQUEST";
+      embedColor = 16096779; // Radiant Amber (#F59E0B)
     } else if (selectedCategory === "other") {
-      const typeName = selectedCustomCategory.trim() || "Other";
-      categoryDisplay = `🧩 Other (${typeName})`;
-      categoryPrefix = `🧩 [${typeName.toUpperCase()}]`;
-      embedColor = 9133302; // Purple (#8B5CF6)
+      const typeName = selectedCustomCategory.trim() || "Feedback";
+      categoryAuthor = `🧩 ${typeName.toUpperCase()}`;
+      embedColor = 9133302; // Violet (#8B5CF6)
+    }
+
+    const fields = [
+      { name: "👤 Submitter", value: trimmedEmail, inline: true },
+      { name: "💻 System", value: `Windows (${process.arch})`, inline: true },
+    ];
+
+    if (selectedCategory === "other" && selectedCustomCategory.trim()) {
+      fields.push({ name: "🏷️ Topic", value: selectedCustomCategory.trim(), inline: true });
     }
 
     const embed = {
-      title: `${categoryPrefix} ${enteredTitle.trim()}`,
+      author: {
+        name: categoryAuthor,
+      },
+      title: enteredTitle.trim(),
+      description: enteredDescription.trim(),
       color: embedColor,
-      fields: [
-        { name: "👤 Submitter Email", value: trimmedEmail, inline: true },
-        { name: "🏷️ Category", value: categoryDisplay, inline: true },
-        { name: "💻 System Info", value: `Windows (${process.arch}) • Search Router v2.0`, inline: true },
-        { name: "📝 Details", value: enteredDescription.trim() },
-        { name: "📌 Status", value: "⏳ New / Awaiting Review", inline: true },
-      ],
-      footer: { text: "Search Router User Feedback" },
+      fields,
+      footer: { text: "Search Router v2.0" },
       timestamp: new Date().toISOString(),
     };
 
-        console.log("[FeedbackForm] Sending payload to Cloudflare:", { category: selectedCategory, title: enteredTitle.trim(), email: trimmedEmail });
+    console.log("[FeedbackForm] Sending payload to Cloudflare:", { category: selectedCategory, title: enteredTitle.trim(), email: trimmedEmail });
     if (FEEDBACK_WORKER_URL && FEEDBACK_WORKER_URL.trim().startsWith("https://")) {
       try {
         const response = await fetch(FEEDBACK_WORKER_URL.trim(), {
