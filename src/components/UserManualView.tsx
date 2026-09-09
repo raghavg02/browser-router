@@ -7,34 +7,92 @@ Welcome to **Search Router**! Search Router gives you instant, keyboard-driven c
 
 ---
 
-## ⚡ Quick Start: Dual-Mode Architecture
+## ⚡ 1. Root Search & Fallback Command
 
-Search Router features a **Dual-Mode** input system designed for zero friction:
+You can use Search Router directly from Raycast's home search bar! Whenever you type a search query or URL, Search Router appears as an instant fallback command.
 
-### 1. 🔍 Search Query Mode (Default)
-* Type your search query (e.g. \`react hooks tutorial\`) or a direct URL (\`github.com\`, \`localhost:3000\`).
-* **All browser profiles stay visible** so you never lose sight of your destinations while typing.
-* Press **\`Enter\`** on any profile to immediately launch into that profile.
+![Raycast Root Search & Fallback](assets/screenshots/01_root_search.png)
 
-### 2. 🎯 Profile Filter Mode
-* Press **\`Tab\`** to toggle into Profile Filter Mode.
-* Your typed search query is **safely preserved** in memory!
-* In this mode, typing filters the profile list in real-time by:
-  * **Browser name** (\`chrome\`, \`edge\`, \`brave\`, \`vivaldi\`, \`firefox\`)
-  * **Profile name** (\`Personal\`, \`Work\`, \`Default\`)
-  * **Directory name** (\`Default\`, \`Profile 1\`, \`Profile 2\`)
-  * **Account email** (\`work@company.com\`, \`personal@example.com\`)
-* Press **\`Tab\`** again to switch back to Search Query Mode.
+* Type your search query or web URL on Raycast's home screen.
+* Press **\`Enter\`** on **Search Router** to route it immediately to your favorite browser profile.
 
 ---
 
-## 🌐 URL & Destination Routing
+## 🚀 2. Instant Query & Argument Routing
+
+Search Router supports direct argument execution, letting you pass queries seamlessly from shortcuts or quick links:
+
+![Query & Argument Routing](assets/screenshots/02_query_routing.png)
+
+* Type your search query (e.g. \`Modern Web Design\`) or a direct URL (\`github.com\`, \`localhost:3000\`).
+* All browser profiles stay visible so you never lose sight of your destinations while typing.
+
+---
+
+## 🎯 3. Profile Filter Mode (\`Tab\`)
+
+Need to find a specific browser or profile among many? Toggle into **Profile Filter Mode** with a single keystroke:
+
+![Profile Filter Mode](assets/screenshots/03_profile_filter.png)
+
+* Press **\`Tab\`** to toggle between **Search Query Mode** and **Profile Filter Mode**.
+* Your typed search query is **safely preserved in memory**!
+* Type to filter profiles in real-time by:
+  * **Browser name** (\`chrome\`, \`edge\`, \`brave\`, \`vivaldi\`, \`firefox\`)
+  * **Profile name** (\`Personal\`, \`Coding\`, \`College\`, \`Business\`)
+  * **Directory name** (\`Default\`, \`Profile 1\`, \`Profile 2\`)
+* Press **\`Tab\`** again to return to Search Query Mode.
+
+---
+
+## ⚡ 4. Action Panel & Power Shortcuts (\`Ctrl + K\`)
+
+Press **\`Ctrl + K\`** on any profile to reveal quick actions and shortcuts:
+
+![Action Panel & Shortcuts](assets/screenshots/04_action_panel.png)
+
+* **\`Enter\`**: Open query or URL in the selected profile.
+* **\`Ctrl + Enter\`**: Open in **Incognito / InPrivate** mode.
+* **\`Tab\`**: Switch to Profile Filter Mode.
+* **\`Ctrl + F\`**: Pin / unpin to **Favorites** at the very top.
+* **\`Ctrl + E\`**: Rename profile display nickname.
+* **\`Ctrl + N\`**: Add a custom or portable browser.
+* **\`Ctrl + H\`**: Open this User Manual anytime.
+* **\`Ctrl + Shift + F\`**: Open the Feedback & Bug Report box.
+
+---
+
+## ✏️ 5. Custom Profile Nicknames (\`Ctrl + E\`)
+
+Personalize your browser profiles with friendly, easy-to-read names:
+
+![Rename Profile Display Name](assets/screenshots/05_rename_profile.png)
+
+* Highlight any profile and press **\`Ctrl + E\`** (or choose *Rename Display Name* from actions).
+* Type a custom nickname (e.g. *"Chrome — Personal"*, *"Chrome — Coding"*).
+* Clear the input and save to revert to the default detected name anytime.
+
+---
+
+## ➕ 6. Add Custom & Portable Browsers (\`Ctrl + N\`)
+
+If you use portable browsers, developer builds (Canary, Developer Edition), or non-standard install paths, register them effortlessly:
+
+![Add Custom / Portable Browser](assets/screenshots/06_custom_profile.png)
+
+* Press **\`Ctrl + N\`** (or choose *Add Custom Profile* from the Action Panel).
+* Enter the browser name, profile display name, and executable path (\`.exe\`).
+* Custom profiles can be removed anytime with **\`Ctrl + Backspace\`**.
+
+---
+
+## 🌐 URL & Destination Routing Cheat-Sheet
 
 Search Router automatically detects and parses whatever you type:
 
 | Input Type | Example | How Search Router Handles It |
 | :--- | :--- | :--- |
-| **Search Query** | \`best ergonomic mechanical keyboard\` | Encodes query and routes to your configured search engine |
+| **Search Query** | \`modern web design\` | Encodes query and routes to your configured search engine |
 | **Standard URL** | \`https://news.ycombinator.com\` | Opens destination directly without searching |
 | **Bare Domain** | \`github.com/trending\` | Automatically prepends \`https://\` and opens |
 | **Localhost & Ports** | \`localhost:3000\`, \`127.0.0.1:8080\` | Automatically prepends \`http://\` and opens local dev servers |
@@ -43,7 +101,7 @@ Search Router automatically detects and parses whatever you type:
 
 ---
 
-## ⌨️ Keyboard Shortcuts Cheat-Sheet
+## ⌨️ Complete Keyboard Shortcuts
 
 | Shortcut | Action | Description |
 | :--- | :--- | :--- |
@@ -51,7 +109,7 @@ Search Router automatically detects and parses whatever you type:
 | **\`Ctrl + Enter\`** | **Open Incognito** | Launches selected profile in Incognito (Chrome/Brave) or InPrivate (Edge) |
 | **\`Tab\`** | **Toggle Search / Filter** | Switches between Search Query Mode and Profile Filter Mode |
 | **\`Ctrl + F\`** | **Toggle Favorite** | Pins or unpins the profile to the top "Favorites" section |
-| **\`Ctrl + E\`** | **Rename Profile** | Sets a custom friendly nickname (e.g. *"Work - Research"*) |
+| **\`Ctrl + E\`** | **Rename Profile** | Sets a custom friendly nickname (e.g. *"Chrome — Coding"*) |
 | **\`Ctrl + N\`** | **Add Custom Profile** | Registers a portable browser or custom profile path |
 | **\`Ctrl + H\`** | **User Manual** | Opens this comprehensive guide and shortcuts reference |
 | **\`Ctrl + Shift + F\`** | **Send Feedback** | Opens the built-in Bug Report & Feature Request box |
@@ -59,39 +117,6 @@ Search Router automatically detects and parses whatever you type:
 | **\`Ctrl + C\`** | **Copy Target URL** | Copies the generated search or destination URL to clipboard |
 | **\`Ctrl + R\`** | **Refresh Profiles** | Re-scans Windows system for newly added browser profiles |
 | **\`Ctrl + ,\`** | **Preferences** | Opens extension settings (Default Search Engine, Custom URL) |
-
----
-
-## ⭐ Profile Management & Customization
-
-### 📌 Pinning Favorites
-Keep your daily drivers at the top:
-* Highlight any profile and press **\`Ctrl + F\`** to pin it to **Favorites**.
-* Press **\`Ctrl + F\`** again to unpin.
-
-### ✏️ Custom Profile Nicknames
-* Highlight a profile and press **\`Ctrl + E\`** (or choose *Rename Display Name* from actions).
-* Type a custom display name (e.g. *"Work Workspace"* or *"Streaming Edge"*).
-* Clear the text field and submit to revert to the default detected name.
-
-### ➕ Adding Custom & Portable Browsers
-If you use a portable browser, Canary/Beta build, or custom install folder:
-* Press **\`Ctrl + N\`** (or choose *Add Custom Profile*).
-* Provide the browser name, profile display name, and executable path (\`.exe\`).
-* Custom profiles can be removed anytime with **\`Ctrl + Backspace\`**.
-
----
-
-## ⚙️ Search Engine Preferences
-
-Change your default search engine anytime in Extension Preferences (**\`Ctrl + ,\`**):
-* **Google** (Default)
-* **DuckDuckGo**
-* **Bing**
-* **Brave Search**
-* **Perplexity AI**
-* **Ecosia**
-* **Custom Search Engine** (Enter custom URL with \`%s\`, e.g. \`https://kagi.com/search?q=%s\`)
 
 ---
 
