@@ -1,6 +1,6 @@
 import { Form, ActionPanel, Action, useNavigation, showToast, Toast, Icon } from "@raycast/api";
 import { useState } from "react";
-import { getWebhookUrlForCategory } from "../config/feedbackConfig";
+import { FEEDBACK_WORKER_URL } from "../config/feedbackConfig";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -82,7 +82,7 @@ export function FeedbackForm() {
       title: "Sending feedback...",
     });
 
-    const webhookUrl = getWebhookUrlForCategory(category);
+    // Webhook URL is routed securely through Cloudflare Worker relay
 
     let categoryDisplay = "General Feedback";
     let categoryPrefix = "💬 [GENERAL FEEDBACK]";
@@ -117,13 +117,14 @@ export function FeedbackForm() {
       timestamp: new Date().toISOString(),
     };
 
-    if (webhookUrl && webhookUrl.trim().startsWith("https://")) {
+    if (FEEDBACK_WORKER_URL && FEEDBACK_WORKER_URL.trim().startsWith("https://")) {
       try {
-        const response = await fetch(webhookUrl.trim(), {
+        const response = await fetch(FEEDBACK_WORKER_URL.trim(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            embeds: [embed],
+            category,
+            embed,
           }),
         });
 
@@ -133,9 +134,18 @@ export function FeedbackForm() {
           toast.message = "Thank you! We have received your feedback.";
           pop();
         } else {
+          let errDetail = `Status ${response.status}`;
+          try {
+            const errJson = await response.json();
+            if (errJson && typeof errJson === "object" && "error" in errJson) {
+              errDetail = String(errJson.error);
+            }
+          } catch {
+            // ignore
+          }
           toast.style = Toast.Style.Failure;
           toast.title = "Failed to send feedback";
-          toast.message = `Discord returned status ${response.status}. Please check your webhook URL.`;
+          toast.message = errDetail;
         }
       } catch (err: unknown) {
         toast.style = Toast.Style.Failure;
@@ -147,7 +157,7 @@ export function FeedbackForm() {
     } else {
       toast.style = Toast.Style.Success;
       toast.title = "Feedback Validated!";
-      toast.message = "Form is ready. Configure your Discord Webhook in src/config/feedbackConfig.ts to receive alerts.";
+      toast.message = "Cloudflare Worker relay is not configured.";
       setIsSubmitting(false);
       pop();
     }
