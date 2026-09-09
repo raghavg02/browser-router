@@ -1,7 +1,48 @@
-import { Detail, ActionPanel, Action, Icon, openExtensionPreferences } from "@raycast/api";
+import { Detail, ActionPanel, Action, Icon, openExtensionPreferences, useNavigation, environment } from "@raycast/api";
+import { useMemo } from "react";
+import fs from "fs";
+import path from "path";
 import { FeedbackForm } from "./FeedbackForm";
 
-export const USER_MANUAL_MARKDOWN = `# 🧭 Search Router — Complete User Manual & Guide
+function getScreenshotUri(filename: string): string {
+  try {
+    const assetsDir = environment.assetsPath;
+    const fullPath = path.join(assetsDir, "screenshots", filename);
+    if (fs.existsSync(fullPath)) {
+      const b64 = fs.readFileSync(fullPath).toString("base64");
+      return `data:image/png;base64,${b64}`;
+    }
+  } catch {
+    // fallback to relative path if fs fails
+  }
+  return `assets/screenshots/${filename}`;
+}
+
+interface UserManualViewProps {
+  onDismissFirstRun?: () => void;
+  isFirstRun?: boolean;
+}
+
+export function UserManualView({ onDismissFirstRun, isFirstRun = false }: UserManualViewProps) {
+  const { pop } = useNavigation();
+
+  function handleBack() {
+    if (isFirstRun && onDismissFirstRun) {
+      onDismissFirstRun();
+    } else {
+      pop();
+    }
+  }
+
+  const markdown = useMemo(() => {
+    const img1 = getScreenshotUri("01_root_search.png");
+    const img2 = getScreenshotUri("02_query_routing.png");
+    const img3 = getScreenshotUri("03_profile_filter.png");
+    const img4 = getScreenshotUri("04_action_panel.png");
+    const img5 = getScreenshotUri("05_rename_profile.png");
+    const img6 = getScreenshotUri("06_custom_profile.png");
+
+    return `# 🧭 Search Router — Complete User Manual & Guide
 
 Welcome to **Search Router**! Search Router gives you instant, keyboard-driven control over routing web searches and URLs to any browser and profile installed on Windows.
 
@@ -11,7 +52,7 @@ Welcome to **Search Router**! Search Router gives you instant, keyboard-driven c
 
 You can use Search Router directly from Raycast's home search bar! Whenever you type a search query or URL, Search Router appears as an instant fallback command.
 
-![Raycast Root Search & Fallback](assets/screenshots/01_root_search.png)
+![Raycast Root Search & Fallback](${img1})
 
 * Type your search query or web URL on Raycast's home screen.
 * Press **\`Enter\`** on **Search Router** to route it immediately to your favorite browser profile.
@@ -22,7 +63,7 @@ You can use Search Router directly from Raycast's home search bar! Whenever you 
 
 Search Router supports direct argument execution, letting you pass queries seamlessly from shortcuts or quick links:
 
-![Query & Argument Routing](assets/screenshots/02_query_routing.png)
+![Query & Argument Routing](${img2})
 
 * Type your search query (e.g. \`Modern Web Design\`) or a direct URL (\`github.com\`, \`localhost:3000\`).
 * All browser profiles stay visible so you never lose sight of your destinations while typing.
@@ -33,7 +74,7 @@ Search Router supports direct argument execution, letting you pass queries seaml
 
 Need to find a specific browser or profile among many? Toggle into **Profile Filter Mode** with a single keystroke:
 
-![Profile Filter Mode](assets/screenshots/03_profile_filter.png)
+![Profile Filter Mode](${img3})
 
 * Press **\`Tab\`** to toggle between **Search Query Mode** and **Profile Filter Mode**.
 * Your typed search query is **safely preserved in memory**!
@@ -49,7 +90,7 @@ Need to find a specific browser or profile among many? Toggle into **Profile Fil
 
 Press **\`Ctrl + K\`** on any profile to reveal quick actions and shortcuts:
 
-![Action Panel & Shortcuts](assets/screenshots/04_action_panel.png)
+![Action Panel & Shortcuts](${img4})
 
 * **\`Enter\`**: Open query or URL in the selected profile.
 * **\`Ctrl + Enter\`**: Open in **Incognito / InPrivate** mode.
@@ -66,7 +107,7 @@ Press **\`Ctrl + K\`** on any profile to reveal quick actions and shortcuts:
 
 Personalize your browser profiles with friendly, easy-to-read names:
 
-![Rename Profile Display Name](assets/screenshots/05_rename_profile.png)
+![Rename Profile Display Name](${img5})
 
 * Highlight any profile and press **\`Ctrl + E\`** (or choose *Rename Display Name* from actions).
 * Type a custom nickname (e.g. *"Chrome — Personal"*, *"Chrome — Coding"*).
@@ -78,7 +119,7 @@ Personalize your browser profiles with friendly, easy-to-read names:
 
 If you use portable browsers, developer builds (Canary, Developer Edition), or non-standard install paths, register them effortlessly:
 
-![Add Custom / Portable Browser](assets/screenshots/06_custom_profile.png)
+![Add Custom / Portable Browser](${img6})
 
 * Press **\`Ctrl + N\`** (or choose *Add Custom Profile* from the Action Panel).
 * Enter the browser name, profile display name, and executable path (\`.exe\`).
@@ -96,7 +137,7 @@ Search Router automatically detects and parses whatever you type:
 | **Standard URL** | \`https://news.ycombinator.com\` | Opens destination directly without searching |
 | **Bare Domain** | \`github.com/trending\` | Automatically prepends \`https://\` and opens |
 | **Localhost & Ports** | \`localhost:3000\`, \`127.0.0.1:8080\` | Automatically prepends \`http://\` and opens local dev servers |
-| **Windows File Path** | \`C:\\Users\\Username\\Documents\\page.html\` | Automatically converts to \`file:///\` URI and opens local document |
+| **Windows File Path** | \`C:\\\\Users\\\\Username\\\\Documents\\\\page.html\` | Automatically converts to \`file:///\` URI and opens local document |
 | **Internal Browser Pages** | \`chrome://extensions\`, \`edge://settings\` | Handled cleanly; falls back to a clean tab if restricted externally |
 
 ---
@@ -135,25 +176,18 @@ Found a bug or have an idea for a feature?
 * Press **\`Ctrl + Shift + F\`** anywhere in Search Router.
 * Submit a report directly to the development team via our automated relay.
 `;
+  }, []);
 
-interface UserManualViewProps {
-  onDismissFirstRun?: () => void;
-  isFirstRun?: boolean;
-}
-
-export function UserManualView({ onDismissFirstRun, isFirstRun = false }: UserManualViewProps) {
   return (
     <Detail
-      markdown={USER_MANUAL_MARKDOWN}
+      markdown={markdown}
       actions={
         <ActionPanel>
-          {isFirstRun && onDismissFirstRun ? (
-            <Action
-              title="Get Started (Go to Search Router)"
-              icon={Icon.Checkmark}
-              onAction={onDismissFirstRun}
-            />
-          ) : null}
+          <Action
+            title="Back to Search Router"
+            icon={Icon.ArrowLeft}
+            onAction={handleBack}
+          />
           <Action.Push
             title="Send Feedback / Feature Request"
             icon={Icon.Envelope}
@@ -168,7 +202,7 @@ export function UserManualView({ onDismissFirstRun, isFirstRun = false }: UserMa
           />
           <Action.CopyToClipboard
             title="Copy User Manual"
-            content={USER_MANUAL_MARKDOWN}
+            content={markdown}
             shortcut={{ modifiers: ["ctrl"], key: "c" }}
           />
         </ActionPanel>
