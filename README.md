@@ -1,6 +1,6 @@
 <div align="center">
 
-  <a href="https://github.com/raghavg02/search-router">
+  <a href="https://github.com/raghavg02/browser-router">
     <img src="assets/extension-icon.png" alt="Browser Router Logo" width="100" height="100" />
   </a>
 
@@ -290,7 +290,7 @@ Search for **Browser Router** in the Raycast Store and click **Install Extension
 ### Local Development Setup
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/raghavg02/search-router.git
+   git clone https://github.com/raghavg02/browser-router.git
    cd browser-router
    ```
 

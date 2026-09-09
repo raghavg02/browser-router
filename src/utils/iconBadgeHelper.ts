@@ -265,14 +265,14 @@ export function getAssetsDir(): string {
     path.join(__dirname, "assets"),
     path.join(__dirname, "..", "assets"),
     path.join(__dirname, "..", "..", "assets"),
-    path.join(home, ".config", "raycast", "extensions", "search-router", "assets"),
-    path.join(home, ".config", "raycast-x", "extensions", "search-router", "assets"),
-    path.join(home, "AppData", "Local", "Raycast", "extensions", "search-router", "assets"),
+    path.join(home, ".config", "raycast", "extensions", "browser-router", "assets"),
+    path.join(home, ".config", "raycast-x", "extensions", "browser-router", "assets"),
+    path.join(home, "AppData", "Local", "Raycast", "extensions", "browser-router", "assets"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  return path.join(home, ".config", "raycast", "extensions", "search-router", "assets");
+  return path.join(home, ".config", "raycast", "extensions", "browser-router", "assets");
 }
 
 export function ensureAvatarBadgedIcon(
