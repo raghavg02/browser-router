@@ -51,30 +51,26 @@ export async function launchBrowserProfile(
         }
       }
 
-      if (
-        profile.browserId === "brave" ||
-        profile.browserId === "vivaldi" ||
-        profile.browserId === "arc" ||
-        profile.browserId === "opera" ||
-        profile.isCustom
-      ) {
-        let udd = profile.userDataDir;
-        if (!udd && process.platform === "win32") {
-          const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-          const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-          if (profile.browserId === "brave") {
-            udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
-          } else if (profile.browserId === "vivaldi") {
-            udd = path.join(localAppData, "Vivaldi", "User Data");
-          } else if (profile.browserId === "arc") {
-            udd = path.join(localAppData, "Arc", "User Data");
-          } else if (profile.browserId === "opera") {
-            udd = path.join(appData, "Opera Software", "Opera Stable");
-          }
+      let udd = profile.userDataDir;
+      if (!udd && process.platform === "win32") {
+        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+        const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+        if (profile.browserId === "chrome") {
+          udd = path.join(localAppData, "Google", "Chrome", "User Data");
+        } else if (profile.browserId === "edge") {
+          udd = path.join(localAppData, "Microsoft", "Edge", "User Data");
+        } else if (profile.browserId === "brave") {
+          udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
+        } else if (profile.browserId === "vivaldi") {
+          udd = path.join(localAppData, "Vivaldi", "User Data");
+        } else if (profile.browserId === "arc") {
+          udd = path.join(localAppData, "Arc", "User Data");
+        } else if (profile.browserId === "opera") {
+          udd = path.join(appData, "Opera Software", "Opera Stable");
         }
-        if (udd) {
-          args.push(`--user-data-dir=${udd}`);
-        }
+      }
+      if (udd) {
+        args.push(`--user-data-dir=${udd}`);
       }
 
       if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
