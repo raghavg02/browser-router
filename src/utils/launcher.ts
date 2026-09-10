@@ -51,26 +51,30 @@ export async function launchBrowserProfile(
         }
       }
 
-      let udd = profile.userDataDir;
-      if (!udd && process.platform === "win32") {
-        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-        const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-        if (profile.browserId === "chrome") {
-          udd = path.join(localAppData, "Google", "Chrome", "User Data");
-        } else if (profile.browserId === "edge") {
-          udd = path.join(localAppData, "Microsoft", "Edge", "User Data");
-        } else if (profile.browserId === "brave") {
-          udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
-        } else if (profile.browserId === "vivaldi") {
-          udd = path.join(localAppData, "Vivaldi", "User Data");
-        } else if (profile.browserId === "arc") {
-          udd = path.join(localAppData, "Arc", "User Data");
-        } else if (profile.browserId === "opera") {
-          udd = path.join(appData, "Opera Software", "Opera Stable");
+      // Edge has Windows Startup Boost background processes that hold an exclusive lock
+      // on its User Data directory. Passing --user-data-dir causes Edge to hang or fail.
+      // For Chrome, Brave, Vivaldi, Arc, Opera, and custom profiles, passing --user-data-dir
+      // is essential to prevent Raycast's desktop sandbox from virtualizing the profile.
+      if (profile.browserId !== "edge") {
+        let udd = profile.userDataDir;
+        if (!udd && process.platform === "win32") {
+          const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
+          const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+          if (profile.browserId === "chrome") {
+            udd = path.join(localAppData, "Google", "Chrome", "User Data");
+          } else if (profile.browserId === "brave") {
+            udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
+          } else if (profile.browserId === "vivaldi") {
+            udd = path.join(localAppData, "Vivaldi", "User Data");
+          } else if (profile.browserId === "arc") {
+            udd = path.join(localAppData, "Arc", "User Data");
+          } else if (profile.browserId === "opera") {
+            udd = path.join(appData, "Opera Software", "Opera Stable");
+          }
         }
-      }
-      if (udd) {
-        args.push(`--user-data-dir=${udd}`);
+        if (udd) {
+          args.push(`--user-data-dir=${udd}`);
+        }
       }
 
       if (profile.profileDirectory && profile.profileDirectory !== "default-no-arg") {
