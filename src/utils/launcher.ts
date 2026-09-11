@@ -185,12 +185,33 @@ export async function launchBrowserProfile(
     // An allowlist ensures spawned browsers only receive standard Windows OS environment variables.
     const cleanEnv = getCleanBrowserEnv();
 
-    const child = spawn(profile.executablePath, args, {
-      detached: true,
-      stdio: "ignore",
-      cwd: fs.existsSync(exeDir) ? exeDir : undefined,
-      env: cleanEnv,
-    });
+    // On Windows, launching via 'cmd.exe /c start' delegates process creation to the Windows Shell (explorer.exe).
+    // This runs the browser with the user's interactive desktop session token rather than inheriting the parent
+    // Electron/MSIX container token, ensuring Google Chrome's App-Bound Encryption can decrypt persistent cookies.
+    const child =
+      process.platform === "win32"
+        ? spawn(
+            "cmd.exe",
+            [
+              "/c",
+              "start",
+              '""',
+              `"${profile.executablePath}"`,
+              ...args.map((a) => (a.includes(" ") && !a.startsWith('"') ? `"${a}"` : a)),
+            ],
+            {
+              windowsVerbatimArguments: true,
+              detached: true,
+              stdio: "ignore",
+              cwd: fs.existsSync(exeDir) ? exeDir : undefined,
+            },
+          )
+        : spawn(profile.executablePath, args, {
+            detached: true,
+            stdio: "ignore",
+            cwd: fs.existsSync(exeDir) ? exeDir : undefined,
+            env: cleanEnv,
+          });
 
     return new Promise<boolean>((resolve) => {
       let settled = false;
