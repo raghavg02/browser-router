@@ -204,6 +204,7 @@ export async function launchBrowserProfile(
               detached: true,
               stdio: "ignore",
               cwd: fs.existsSync(exeDir) ? exeDir : undefined,
+              env: cleanEnv,
             },
           )
         : spawn(profile.executablePath, args, {
