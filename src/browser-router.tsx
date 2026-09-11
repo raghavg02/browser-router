@@ -20,6 +20,8 @@ import { launchBrowserProfile } from "./utils/launcher";
 import { toggleFavorite, removeCustomProfile } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
 import { RenameProfileForm } from "./components/RenameProfileForm";
+import { VaultUnlockView } from "./components/vault/VaultUnlockView";
+import { VaultMainView } from "./components/vault/VaultMainView";
 import { FeedbackForm } from "./components/FeedbackForm";
 import { UserManualView } from "./components/UserManualView";
 
@@ -219,6 +221,15 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               ) : null}
             </ActionPanel.Section>
 
+            <ActionPanel.Section title="Security & Vault">
+              <Action.Push
+                title="Open Encrypted Vault…"
+                icon={Icon.Lock}
+                shortcut={{ modifiers: ["ctrl", "shift"], key: "v" }}
+                target={<VaultBridge />}
+              />
+            </ActionPanel.Section>
+
             <ActionPanel.Section title="Help & Feedback">
               <Action.Push
                 title="User Manual & Guide"
@@ -320,4 +331,14 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       <List.Section title={sectionTitle}>{allOther.map(renderProfileItem)}</List.Section>
     </List>
   );
+}
+
+function VaultBridge() {
+  const [vaultKey, setVaultKey] = useState<Buffer | null>(null);
+
+  if (!vaultKey) {
+    return <VaultUnlockView onUnlocked={(key) => setVaultKey(key)} />;
+  }
+
+  return <VaultMainView vaultKey={vaultKey} onLock={() => setVaultKey(null)} />;
 }

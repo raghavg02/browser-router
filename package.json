@@ -27,6 +27,13 @@
           "required": false
         }
       ]
+    },
+    {
+      "name": "browser-vault",
+      "title": "Encrypted Browser Vault",
+      "subtitle": "Password-Protected Links & Notes",
+      "description": "Securely store private links, secret notes, screenshots, and PDFs with AES-256 encryption",
+      "mode": "view"
     }
   ],
   "preferences": [
@@ -95,6 +102,6 @@
     "lint": "ray lint",
     "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to npm.\\n\\nIf you did intend to publish it to npm, remove the \\`prepublishOnly\\` script and rerun \\`npm publish\\` again.\\nIf you wanted to publish it to the Raycast Store instead, use \\`npm run publish\\` instead.\\n\\n\" && exit 1",
     "publish": "ray publish",
-    "postbuild": "node -e \"require('fs').copyFileSync('dist/browser-router.js', 'browser-router.js'); require('fs').copyFileSync('dist/browser-router.js.map', 'browser-router.js.map');\""
+    "postbuild": "node -e \"const fs = require('fs'); ['browser-router', 'browser-vault'].forEach(name => { if (fs.existsSync('dist/' + name + '.js')) { fs.copyFileSync('dist/' + name + '.js', name + '.js'); if (fs.existsSync('dist/' + name + '.js.map')) fs.copyFileSync('dist/' + name + '.js.map', name + '.js.map'); } });\""
   }
 }

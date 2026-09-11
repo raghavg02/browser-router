@@ -18,6 +18,7 @@ compiled_raycast_rust
 *.js.map
 search-router.js
 browser-router.js
+browser-vault.js
 browser-router.js.map
 search-router.js
 browser-router.js
