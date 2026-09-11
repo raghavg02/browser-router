@@ -57,14 +57,18 @@ export async function launchBrowserProfile(
         // so that Windows Raycast (packaged as MSIX) does not redirect their data to an empty virtualized container.
         // Edge is specifically excluded because Windows Startup Boost background service
         // holds an exclusive lock on Edge's directory.
-        if (profile.browserId !== "edge") {
+        if (
+          profile.browserId === "brave" ||
+          profile.browserId === "vivaldi" ||
+          profile.browserId === "arc" ||
+          profile.browserId === "opera" ||
+          profile.isCustom
+        ) {
           let udd = profile.userDataDir;
           if (!udd && process.platform === "win32") {
             const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
             const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-            if (profile.browserId === "chrome") {
-              udd = path.join(localAppData, "Google", "Chrome", "User Data");
-            } else if (profile.browserId === "brave") {
+            if (profile.browserId === "brave") {
               udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
             } else if (profile.browserId === "vivaldi") {
               udd = path.join(localAppData, "Vivaldi", "User Data");
@@ -89,11 +93,28 @@ export async function launchBrowserProfile(
       }
     }
 
+    // Clean environment to prevent foreign Electron / IDE crashpad variables from polluting browser processes.
+    // Specifically, CHROME_CRASHPAD_PIPE_NAME and ELECTRON_* variables cause Google Chrome
+    // to detect foreign pipe interception, triggering crash-recovery mode and evicting account logins.
+    const cleanEnv: NodeJS.ProcessEnv = {};
+    for (const [key, value] of Object.entries(process.env)) {
+      if (
+        key.startsWith("CHROME_") ||
+        key.startsWith("ELECTRON_") ||
+        key.startsWith("VSCODE_") ||
+        key.startsWith("ANTIGRAVITY_") ||
+        key === "ORIGINAL_XDG_CURRENT_DESKTOP"
+      ) {
+        continue;
+      }
+      cleanEnv[key] = value;
+    }
+
     const child = spawn(profile.executablePath, args, {
       detached: true,
       stdio: "ignore",
       cwd: fs.existsSync(exeDir) ? exeDir : undefined,
-      env: process.env,
+      env: cleanEnv,
     });
 
     return new Promise<boolean>((resolve) => {
