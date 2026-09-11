@@ -52,11 +52,12 @@ export async function launchBrowserProfile(
           args.push("--incognito");
         }
       } else {
-        // Normal profile mode: target specific profile directory and user data directory.
-        // Chrome, Brave, Vivaldi, Arc, Opera, and custom profiles require --user-data-dir
-        // so that Windows Raycast (packaged as MSIX) does not redirect their data to an empty virtualized container.
-        // Edge is specifically excluded because Windows Startup Boost background service
-        // holds an exclusive lock on Edge's directory.
+        // Normal profile mode: target specific profile directory.
+        // For Brave, Vivaldi, Arc, Opera, and custom profiles, passing --user-data-dir
+        // ensures the browser locates its specific data folder and prevents MSIX container virtualization.
+        // Chrome and Edge are specifically EXCLUDED from --user-data-dir:
+        // 1. Chrome's singleton process model treats explicit --user-data-dir as a profile boundary mismatch, evicting active sign-in sessions.
+        // 2. Edge's Startup Boost background service holds an exclusive lock on its User Data directory, causing hangs.
         if (
           profile.browserId === "brave" ||
           profile.browserId === "vivaldi" ||
@@ -98,12 +99,13 @@ export async function launchBrowserProfile(
     // to detect foreign pipe interception, triggering crash-recovery mode and evicting account logins.
     const cleanEnv: NodeJS.ProcessEnv = {};
     for (const [key, value] of Object.entries(process.env)) {
+      const upperKey = key.toUpperCase();
       if (
-        key.startsWith("CHROME_") ||
-        key.startsWith("ELECTRON_") ||
-        key.startsWith("VSCODE_") ||
-        key.startsWith("ANTIGRAVITY_") ||
-        key === "ORIGINAL_XDG_CURRENT_DESKTOP"
+        upperKey.startsWith("CHROME_") ||
+        upperKey.startsWith("ELECTRON_") ||
+        upperKey.startsWith("VSCODE_") ||
+        upperKey.startsWith("ANTIGRAVITY_") ||
+        upperKey === "ORIGINAL_XDG_CURRENT_DESKTOP"
       ) {
         continue;
       }
