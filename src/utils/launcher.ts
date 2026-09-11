@@ -52,23 +52,19 @@ export async function launchBrowserProfile(
           args.push("--incognito");
         }
       } else {
-        // Normal profile mode: target specific profile directory.
-        // For Brave, Vivaldi, Arc, Opera, and custom profiles, passing --user-data-dir
-        // ensures the browser locates its specific data folder.
-        // For standard Chrome and Edge, we must NOT pass --user-data-dir because Chromium interprets
-        // redundant command-line overrides as a new profile boundary, evicting active session cookies.
-        if (
-          profile.browserId === "brave" ||
-          profile.browserId === "vivaldi" ||
-          profile.browserId === "arc" ||
-          profile.browserId === "opera" ||
-          profile.isCustom
-        ) {
+        // Normal profile mode: target specific profile directory and user data directory.
+        // Chrome, Brave, Vivaldi, Arc, Opera, and custom profiles require --user-data-dir
+        // so that Windows Raycast (packaged as MSIX) does not redirect their data to an empty virtualized container.
+        // Edge is specifically excluded because Windows Startup Boost background service
+        // holds an exclusive lock on Edge's directory.
+        if (profile.browserId !== "edge") {
           let udd = profile.userDataDir;
           if (!udd && process.platform === "win32") {
             const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
             const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
-            if (profile.browserId === "brave") {
+            if (profile.browserId === "chrome") {
+              udd = path.join(localAppData, "Google", "Chrome", "User Data");
+            } else if (profile.browserId === "brave") {
               udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
             } else if (profile.browserId === "vivaldi") {
               udd = path.join(localAppData, "Vivaldi", "User Data");
