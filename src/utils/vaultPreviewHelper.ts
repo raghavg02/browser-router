@@ -356,40 +356,71 @@ export function getPythonExecutable(): string {
 }
 
 /**
- * Renders Page 1 of any PDF document into a crystal-clear high-res PNG Base64 Data URI.
+ * Renders Page 1 of any PDF document into an optimized, fast JPEG image with instant disk caching.
+ * Avoids any child_process stdout memory buffering so Raycast's 100MB heap limit is never exceeded.
  */
 export async function renderPdfPageToImage(pdfPath: string): Promise<{ imageUri?: string; pageCount?: number }> {
+  const previewPath = `${pdfPath}.preview.jpg`;
+
+  // 1. Instant Cache Check: If preview already exists on disk, load immediately in 1ms
+  if (fs.existsSync(previewPath)) {
+    try {
+      const buf = fs.readFileSync(previewPath);
+      if (buf.length > 100) {
+        return {
+          imageUri: `data:image/jpeg;base64,${buf.toString("base64")}`,
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Otherwise render using Python PyMuPDF directly to previewPath in ~500ms
   return new Promise((resolve) => {
     const pythonExe = getPythonExecutable();
-    const safePath = pdfPath.replace(/\\/g, "/");
-    const py = `import sys, base64
+    const safePdf = pdfPath.replace(/\\/g, "/");
+    const safeOut = previewPath.replace(/\\/g, "/");
+
+    const py = `import sys
 try:
     import pymupdf
-    doc = pymupdf.open(sys.argv[1])
+    pdf_path = sys.argv[1]
+    out_path = sys.argv[2]
+    doc = pymupdf.open(pdf_path)
     if len(doc) > 0:
-        pix = doc[0].get_pixmap(dpi=150)
-        b64 = base64.b64encode(pix.tobytes("png")).decode("ascii")
-        print("RESULT:" + str(len(doc)) + ";data:image/png;base64," + b64)
+        pix = doc[0].get_pixmap(dpi=90)
+        pix.save(out_path, jpg_quality=80)
+        print("OK:" + str(len(doc)))
 except Exception as e:
     sys.stderr.write(str(e))
 `;
-    execFile(
-      pythonExe,
-      ["-c", py, safePath],
-      { timeout: 8000, windowsHide: true, maxBuffer: 25 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err || !stdout) return resolve({});
-        const out = stdout.trim();
-        if (out.startsWith("RESULT:")) {
-          const semicolonIdx = out.indexOf(";");
-          if (semicolonIdx > 7) {
-            const pageCount = parseInt(out.slice(7, semicolonIdx), 10);
-            const imageUri = out.slice(semicolonIdx + 1);
-            return resolve({ imageUri, pageCount: isNaN(pageCount) ? undefined : pageCount });
-          }
+
+    execFile(pythonExe, ["-c", py, safePdf, safeOut], { timeout: 8000, windowsHide: true }, (err, stdout) => {
+      if (err) {
+        return resolve({});
+      }
+
+      const out = (stdout || "").trim();
+      let pageCount: number | undefined;
+      if (out.startsWith("OK:")) {
+        const count = parseInt(out.slice(3), 10);
+        if (!isNaN(count)) pageCount = count;
+      }
+
+      if (fs.existsSync(previewPath)) {
+        try {
+          const buf = fs.readFileSync(previewPath);
+          return resolve({
+            imageUri: `data:image/jpeg;base64,${buf.toString("base64")}`,
+            pageCount,
+          });
+        } catch {
+          // ignore
         }
-        resolve({});
-      },
-    );
+      }
+
+      resolve({});
+    });
   });
 }

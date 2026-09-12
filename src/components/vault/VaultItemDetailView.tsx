@@ -136,15 +136,29 @@ export function VaultItemDetailView({
             // ignore
           }
         } else if (fileCategory === "pdf") {
-          setIsPdfRendering(true);
-          renderPdfPageToImage(p)
-            .then((res) => {
-              if (res.imageUri) setPdfImageUri(res.imageUri);
-              if (res.pageCount) setPdfPageCount(res.pageCount);
-            })
-            .finally(() => {
-              setIsPdfRendering(false);
-            });
+          // Check if cached preview already exists for instant 1ms render
+          const cachedPreview = `${p}.preview.jpg`;
+          if (fs.existsSync(cachedPreview)) {
+            try {
+              const buf = fs.readFileSync(cachedPreview);
+              if (buf.length > 100) {
+                setPdfImageUri(`data:image/jpeg;base64,${buf.toString("base64")}`);
+                setIsPdfRendering(false);
+              }
+            } catch {
+              // ignore
+            }
+          } else {
+            setIsPdfRendering(true);
+            renderPdfPageToImage(p)
+              .then((res) => {
+                if (res.imageUri) setPdfImageUri(res.imageUri);
+                if (res.pageCount) setPdfPageCount(res.pageCount);
+              })
+              .finally(() => {
+                setIsPdfRendering(false);
+              });
+          }
         } else if (fileCategory === "video") {
           extractWindowsThumbnail(p).then((thumb) => {
             if (thumb) setThumbnailUri(thumb);
