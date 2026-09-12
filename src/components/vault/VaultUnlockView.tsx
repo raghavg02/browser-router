@@ -165,12 +165,17 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
   if (isSetup === false) {
     return (
       <Form
+        navigationTitle="🔒 Set Up Encrypted Vault"
         actions={
           <ActionPanel>
             <Action.SubmitForm title="Create Vault & Encrypt" icon={Icon.Lock} onSubmit={handleSetup} />
           </ActionPanel>
         }
       >
+        <Form.Description
+          title="🔒 Vault Setup"
+          text="Choose a master password or PIN to protect your private browser profiles, tabs, files, and notes with AES-256 encryption."
+        />
         <Form.PasswordField
           id="password"
           title="Master Password / PIN"
@@ -237,6 +242,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
 
   return (
     <Form
+      navigationTitle="🔒 Encrypted Browser Vault"
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Unlock Vault" icon={Icon.LockUnlocked} onSubmit={handleManualUnlock} />
@@ -255,13 +261,25 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         </ActionPanel>
       }
     >
+      <Form.Description title="🔒 Status" text="Vault is locked with AES-256-GCM encryption" />
+
       <Form.PasswordField
         id="password"
         title="Master Password"
-        placeholder="Enter password or PIN (auto-unlocks)"
+        placeholder="Enter password or PIN to decrypt..."
+        info="The vault decrypts and unlocks automatically as you type."
         value={password}
         error={passwordError}
         onChange={handlePasswordChange}
+      />
+
+      <Form.Separator />
+
+      <Form.Description
+        title="💡 Shortcuts & Help"
+        text={
+          "• Auto-Unlock: Decrypts immediately upon typing your password\n• Password Hint: Press Ctrl + H for your private hint dialog\n• Account Recovery: Press Ctrl + Shift + R to recover via your security question"
+        }
       />
     </Form>
   );
