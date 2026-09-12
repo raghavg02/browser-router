@@ -42,6 +42,7 @@ export function VaultItemDetailView({
   const [decryptedPath, setDecryptedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isShowingDetails, setIsShowingDetails] = useState(false);
 
   const firstAttachment: VaultAttachment | undefined =
     item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
@@ -164,9 +165,10 @@ export function VaultItemDetailView({
 
     if (firstAttachment) {
       if (fileCategory === "image" && decryptedPath) {
-        // Markdown image preview
-        md += `# ${item.title}\n\n`;
-        md += `![${firstAttachment.name}](${decryptedPath})\n\n`;
+        // Format path with forward slashes and URL-encode special chars/spaces/parentheses
+        const forwardPath = decryptedPath.replace(/\\/g, "/");
+        const encodedUrl = encodeURI(forwardPath).replace(/\(/g, "%28").replace(/\)/g, "%29");
+        md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${encodedUrl})\n\n`;
       } else if (fileCategory === "code" || fileCategory === "document") {
         const ext = path.extname(firstAttachment.name).replace(".", "") || "txt";
         md += `# ${item.title}\n\n`;
@@ -207,52 +209,56 @@ export function VaultItemDetailView({
       isLoading={isLoading}
       markdown={markdown}
       metadata={
-        <Detail.Metadata>
-          <Detail.Metadata.Label
-            title="Category"
-            text={item.category.toUpperCase()}
-            icon={item.isFavorite ? { source: Icon.Star, tintColor: Color.Yellow } : Icon.Lock}
-          />
-          <Detail.Metadata.Label
-            title="Created"
-            text={new Date(item.createdAt).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          />
-          {firstAttachment ? (
-            <>
-              <Detail.Metadata.Separator />
-              <Detail.Metadata.Label title="Attachment" text={firstAttachment.name} icon={Icon.Paperclip} />
-              <Detail.Metadata.Label
-                title="Size"
-                text={
-                  firstAttachment.size > 1024 * 1024
-                    ? `${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB`
-                    : `${(firstAttachment.size / 1024).toFixed(1)} KB`
-                }
-              />
-              <Detail.Metadata.Label
-                title="Default Opener"
-                text={firstAttachment.customAppPath ? path.basename(firstAttachment.customAppPath) : "Windows Default"}
-              />
-            </>
-          ) : null}
-          {item.url ? (
-            <>
-              <Detail.Metadata.Separator />
-              <Detail.Metadata.Link title="Destination URL" target={item.url} text={item.url} />
-              <Detail.Metadata.Label
-                title="Preferred Browser"
-                text={preferredProfile ? preferredProfile.displayName : "Default Browser"}
-                icon={Icon.Globe}
-              />
-            </>
-          ) : null}
-        </Detail.Metadata>
+        isShowingDetails ? (
+          <Detail.Metadata>
+            <Detail.Metadata.Label
+              title="Category"
+              text={item.category.toUpperCase()}
+              icon={item.isFavorite ? { source: Icon.Star, tintColor: Color.Yellow } : Icon.Lock}
+            />
+            <Detail.Metadata.Label
+              title="Created"
+              text={new Date(item.createdAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            />
+            {firstAttachment ? (
+              <>
+                <Detail.Metadata.Separator />
+                <Detail.Metadata.Label title="Attachment" text={firstAttachment.name} icon={Icon.Paperclip} />
+                <Detail.Metadata.Label
+                  title="Size"
+                  text={
+                    firstAttachment.size > 1024 * 1024
+                      ? `${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB`
+                      : `${(firstAttachment.size / 1024).toFixed(1)} KB`
+                  }
+                />
+                <Detail.Metadata.Label
+                  title="Default Opener"
+                  text={
+                    firstAttachment.customAppPath ? path.basename(firstAttachment.customAppPath) : "Windows Default"
+                  }
+                />
+              </>
+            ) : null}
+            {item.url ? (
+              <>
+                <Detail.Metadata.Separator />
+                <Detail.Metadata.Link title="Destination URL" target={item.url} text={item.url} />
+                <Detail.Metadata.Label
+                  title="Preferred Browser"
+                  text={preferredProfile ? preferredProfile.displayName : "Default Browser"}
+                  icon={Icon.Globe}
+                />
+              </>
+            ) : null}
+          </Detail.Metadata>
+        ) : undefined
       }
       actions={
         <ActionPanel>
@@ -335,6 +341,12 @@ export function VaultItemDetailView({
           ) : null}
 
           <ActionPanel.Section title="Item Actions">
+            <Action
+              title={isShowingDetails ? "Hide Item Details" : "Show Item Details"}
+              icon={Icon.Sidebar}
+              shortcut={{ modifiers: ["ctrl"], key: "i" }}
+              onAction={() => setIsShowingDetails(!isShowingDetails)}
+            />
             <Action
               title="Copy Content / Secret"
               icon={Icon.Clipboard}
