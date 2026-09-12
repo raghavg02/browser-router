@@ -50,16 +50,32 @@ export async function getVaultMetadata(): Promise<VaultMetadata | null> {
   }
 }
 
-export async function setupVault(password: string, passwordHint?: string): Promise<Buffer> {
+export async function setupVault(
+  password: string,
+  passwordHint?: string,
+  securityQuestion?: string,
+  securityAnswer?: string,
+): Promise<Buffer> {
   const salt = generateSalt();
   const key = deriveKey(password, salt);
   const canary = encryptText(CANARY_TEXT, key);
+
+  let secSalt: string | undefined;
+  let recoveryToken: EncryptedPayload | undefined;
+  if (securityQuestion && securityAnswer && securityAnswer.trim()) {
+    secSalt = generateSalt();
+    const recoveryKey = deriveKey(securityAnswer.trim().toLowerCase(), secSalt);
+    recoveryToken = encryptBuffer(key, recoveryKey);
+  }
 
   const metadata: VaultMetadata = {
     salt,
     canary,
     categories: DEFAULT_CATEGORIES,
     passwordHint: passwordHint?.trim() || undefined,
+    securityQuestion: securityQuestion?.trim() || undefined,
+    securitySalt: secSalt,
+    recoveryToken,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -71,6 +87,42 @@ export async function setupVault(password: string, passwordHint?: string): Promi
   await LocalStorage.setItem(KEY_VAULT_ITEMS, JSON.stringify(emptyEncrypted));
 
   return key;
+}
+
+export async function verifySecurityAnswerAndGetKey(answer: string): Promise<Buffer | null> {
+  if (!answer || !answer.trim()) return null;
+  const metadata = await getVaultMetadata();
+  if (!metadata || !metadata.securitySalt || !metadata.recoveryToken) {
+    return null;
+  }
+  try {
+    const recoveryKey = deriveKey(answer.trim().toLowerCase(), metadata.securitySalt);
+    const masterKey = decryptBuffer(metadata.recoveryToken, recoveryKey);
+    // Double-verify by decrypting canary
+    const canary = decryptText(metadata.canary, masterKey);
+    if (canary === CANARY_TEXT) {
+      return masterKey;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setVaultSecurityQuestion(masterKey: Buffer, question: string, answer: string): Promise<void> {
+  const metadata = await getVaultMetadata();
+  if (!metadata) throw new Error("Vault metadata not found");
+
+  const secSalt = generateSalt();
+  const recoveryKey = deriveKey(answer.trim().toLowerCase(), secSalt);
+  const recoveryToken = encryptBuffer(masterKey, recoveryKey);
+
+  metadata.securityQuestion = question.trim();
+  metadata.securitySalt = secSalt;
+  metadata.recoveryToken = recoveryToken;
+  metadata.updatedAt = Date.now();
+
+  await LocalStorage.setItem(KEY_VAULT_METADATA, JSON.stringify(metadata));
 }
 
 export async function unlockVault(password: string): Promise<Buffer | null> {
@@ -189,6 +241,8 @@ export async function changeVaultMasterPassword(
   oldKey: Buffer,
   newPassword: string,
   newHint?: string,
+  securityQuestion?: string,
+  securityAnswer?: string,
 ): Promise<Buffer> {
   const metadata = await getVaultMetadata();
   if (!metadata) throw new Error("Vault not found");
@@ -217,13 +271,28 @@ export async function changeVaultMasterPassword(
   // 3. Re-encrypt items
   await saveVaultItems(items, newKey);
 
-  // 4. Update metadata
+  // 4. Update recovery token if question and answer provided
+  let newSecQuestion = metadata.securityQuestion;
+  let newSecSalt = metadata.securitySalt;
+  let newRecoveryToken = metadata.recoveryToken;
+
+  if (securityQuestion && securityAnswer && securityAnswer.trim()) {
+    newSecQuestion = securityQuestion.trim();
+    newSecSalt = generateSalt();
+    const recoveryKey = deriveKey(securityAnswer.trim().toLowerCase(), newSecSalt);
+    newRecoveryToken = encryptBuffer(newKey, recoveryKey);
+  }
+
+  // 5. Update metadata
   const newCanary = encryptText(CANARY_TEXT, newKey);
   const updatedMetadata: VaultMetadata = {
     ...metadata,
     salt: newSalt,
     canary: newCanary,
     passwordHint: newHint !== undefined ? newHint.trim() || undefined : metadata.passwordHint,
+    securityQuestion: newSecQuestion,
+    securitySalt: newSecSalt,
+    recoveryToken: newRecoveryToken,
     updatedAt: Date.now(),
   };
   await LocalStorage.setItem(KEY_VAULT_METADATA, JSON.stringify(updatedMetadata));

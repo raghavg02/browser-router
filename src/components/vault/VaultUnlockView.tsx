@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { Form, ActionPanel, Action, showToast, Toast, Icon } from "@raycast/api";
+import { Form, ActionPanel, Action, showToast, Toast, Icon, confirmAlert, useNavigation, Keyboard } from "@raycast/api";
 import { isVaultSetup, getVaultMetadata, setupVault, unlockVault, tryUnlockVault } from "../../utils/vaultStorage";
 import { VaultMetadata } from "../../types/vault";
+import { VaultResetPasswordView, PRESET_SECURITY_QUESTIONS } from "./VaultResetPasswordView";
 
 interface VaultUnlockViewProps {
   onUnlocked: (key: Buffer) => void;
 }
 
 export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
+  const { push } = useNavigation();
   const [isSetup, setIsSetup] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -15,8 +17,14 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
   const [storedMetadata, setStoredMetadata] = useState<VaultMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Setup security question fields
+  const [selectedQuestion, setSelectedQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
+  const [customQuestion, setCustomQuestion] = useState("");
+  const [securityAnswer, setSecurityAnswer] = useState("");
+
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
+  const [selectedOption, setSelectedOption] = useState("default");
 
   const isUnlockingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -33,6 +41,39 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
     }
     checkState();
   }, []);
+
+  async function handleShowHint() {
+    const hint = storedMetadata?.passwordHint;
+    if (hint && hint.trim()) {
+      await confirmAlert({
+        icon: Icon.LightBulb,
+        title: "Password Hint",
+        message: hint.trim(),
+        primaryAction: {
+          title: "OK",
+        },
+      });
+    } else {
+      await confirmAlert({
+        icon: Icon.QuestionMark,
+        title: "No Password Hint",
+        message: "No password hint was configured for this vault.",
+        primaryAction: {
+          title: "OK",
+        },
+      });
+    }
+  }
+
+  function handleOptionSelect(value: string) {
+    if (value === "hint") {
+      handleShowHint();
+      setTimeout(() => setSelectedOption("default"), 100);
+    } else if (value === "reset") {
+      push(<VaultResetPasswordView onResetSuccess={onUnlocked} />);
+      setTimeout(() => setSelectedOption("default"), 100);
+    }
+  }
 
   // Automatic unlock as the user types without pressing Enter / Ctrl+Enter
   function handlePasswordChange(val: string) {
@@ -80,7 +121,13 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
     }
 
     try {
-      const key = await setupVault(password, passwordHint);
+      const q = securityAnswer.trim()
+        ? selectedQuestion === "Custom Security Question..."
+          ? customQuestion.trim()
+          : selectedQuestion
+        : undefined;
+
+      const key = await setupVault(password, passwordHint, q, securityAnswer.trim() || undefined);
       await showToast({
         style: Toast.Style.Success,
         title: "Vault Created Successfully",
@@ -136,10 +183,6 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
           </ActionPanel>
         }
       >
-        <Form.Description
-          title="🔐 Encrypted Vault Setup"
-          text="Choose a Master Password or PIN to secure your private links, secret notes, screenshots, and PDFs. All data is protected with zero-knowledge AES-256-GCM encryption."
-        />
         <Form.PasswordField
           id="password"
           title="Master Password / PIN"
@@ -169,36 +212,75 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
           value={passwordHint}
           onChange={setPasswordHint}
         />
+
+        <Form.Separator />
+
+        <Form.Dropdown
+          id="securityQuestion"
+          title="Recovery Question (Optional)"
+          value={selectedQuestion}
+          onChange={setSelectedQuestion}
+        >
+          {PRESET_SECURITY_QUESTIONS.map((q) => (
+            <Form.Dropdown.Item key={q} value={q} title={q} />
+          ))}
+        </Form.Dropdown>
+
+        {selectedQuestion === "Custom Security Question..." && (
+          <Form.TextField
+            id="customQuestion"
+            title="Custom Question"
+            placeholder="e.g. What was the name of your first school?"
+            value={customQuestion}
+            onChange={setCustomQuestion}
+          />
+        )}
+
+        <Form.TextField
+          id="securityAnswer"
+          title="Recovery Answer (Optional)"
+          placeholder="Used to reset password if forgotten"
+          value={securityAnswer}
+          onChange={setSecurityAnswer}
+        />
       </Form>
     );
   }
-
-  const storedHint = storedMetadata?.passwordHint;
 
   return (
     <Form
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Unlock Vault" icon={Icon.LockUnlocked} onSubmit={handleManualUnlock} />
+          <Action
+            title="View Password Hint"
+            icon={Icon.LightBulb}
+            onAction={handleShowHint}
+            shortcut={{ modifiers: ["ctrl"], key: "h" }}
+          />
+          <Action.Push
+            title="Reset Master Password"
+            icon={Icon.Key}
+            target={<VaultResetPasswordView onResetSuccess={onUnlocked} />}
+            shortcut={Keyboard.Shortcut.Common.Refresh}
+          />
         </ActionPanel>
       }
     >
-      <Form.Description
-        title="🔒 Vault is Locked"
-        text={
-          storedHint
-            ? `Enter your master password or PIN to decrypt your private items. It will unlock automatically once entered!\n\n💡 Password Hint: ${storedHint}`
-            : "Enter your master password or PIN to decrypt your private items. It will unlock automatically once entered!"
-        }
-      />
       <Form.PasswordField
         id="password"
         title="Master Password"
-        placeholder="Enter your password / PIN (auto-unlocks)"
+        placeholder="Enter password or PIN (auto-unlocks)"
         value={password}
         error={passwordError}
         onChange={handlePasswordChange}
       />
+
+      <Form.Dropdown id="options" title="Options" value={selectedOption} onChange={handleOptionSelect}>
+        <Form.Dropdown.Item value="default" title="Actions & Recovery..." icon={Icon.Gear} />
+        <Form.Dropdown.Item value="hint" title="💡 View Password Hint" icon={Icon.LightBulb} />
+        <Form.Dropdown.Item value="reset" title="🔑 Reset Master Password" icon={Icon.Key} />
+      </Form.Dropdown>
     </Form>
   );
 }

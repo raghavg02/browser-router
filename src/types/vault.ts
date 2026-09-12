@@ -32,6 +32,9 @@ export interface VaultMetadata {
   canary: EncryptedPayload;
   categories: string[];
   passwordHint?: string;
+  securityQuestion?: string;
+  securitySalt?: string;
+  recoveryToken?: EncryptedPayload;
   createdAt: number;
   updatedAt: number;
 }
