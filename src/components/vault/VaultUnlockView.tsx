@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Form, ActionPanel, Action, showToast, Toast, Icon, confirmAlert, useNavigation, Keyboard } from "@raycast/api";
+import { Form, ActionPanel, Action, showToast, Toast, Icon, confirmAlert } from "@raycast/api";
 import { isVaultSetup, getVaultMetadata, setupVault, unlockVault, tryUnlockVault } from "../../utils/vaultStorage";
 import { VaultMetadata } from "../../types/vault";
 import { VaultResetPasswordView, PRESET_SECURITY_QUESTIONS } from "./VaultResetPasswordView";
@@ -9,7 +9,6 @@ interface VaultUnlockViewProps {
 }
 
 export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
-  const { push } = useNavigation();
   const [isSetup, setIsSetup] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,7 +23,6 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
 
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
-  const [selectedOption, setSelectedOption] = useState("default");
 
   const isUnlockingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -62,16 +60,6 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
           title: "OK",
         },
       });
-    }
-  }
-
-  function handleOptionSelect(value: string) {
-    if (value === "hint") {
-      handleShowHint();
-      setTimeout(() => setSelectedOption("default"), 100);
-    } else if (value === "reset") {
-      push(<VaultResetPasswordView onResetSuccess={onUnlocked} />);
-      setTimeout(() => setSelectedOption("default"), 100);
     }
   }
 
@@ -262,7 +250,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
             title="Reset Master Password"
             icon={Icon.Key}
             target={<VaultResetPasswordView onResetSuccess={onUnlocked} />}
-            shortcut={Keyboard.Shortcut.Common.Refresh}
+            shortcut={{ modifiers: ["ctrl", "shift"], key: "r" }}
           />
         </ActionPanel>
       }
@@ -275,12 +263,6 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         error={passwordError}
         onChange={handlePasswordChange}
       />
-
-      <Form.Dropdown id="options" title="Options" value={selectedOption} onChange={handleOptionSelect}>
-        <Form.Dropdown.Item value="default" title="Actions & Recovery..." icon={Icon.Gear} />
-        <Form.Dropdown.Item value="hint" title="💡 View Password Hint" icon={Icon.LightBulb} />
-        <Form.Dropdown.Item value="reset" title="🔑 Reset Master Password" icon={Icon.Key} />
-      </Form.Dropdown>
     </Form>
   );
 }

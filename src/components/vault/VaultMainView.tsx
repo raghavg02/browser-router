@@ -18,6 +18,7 @@ import { launchBrowserProfile } from "../../utils/launcher";
 import { VaultItemForm } from "./VaultItemForm";
 import { SetCustomAppForm } from "./SetCustomAppForm";
 import { VaultItemDetailView } from "./VaultItemDetailView";
+import { VaultSecurityQuestionView } from "./VaultSecurityQuestionView";
 import {
   getSuggestedAppsForFile,
   browseExecutableOnWindows,
@@ -339,6 +340,16 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
                 style={Action.Style.Destructive}
                 shortcut={Keyboard.Shortcut.Common.Remove}
                 onAction={() => handleDeleteItem(item)}
+              />
+              <Action.Push
+                title="Configure Security Question"
+                icon={Icon.Shield}
+                target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
+              />
+              <Action.Push
+                title="Configure Security Question"
+                icon={Icon.Shield}
+                target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
               />
               <Action
                 title="Lock Vault Now"
