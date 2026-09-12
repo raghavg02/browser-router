@@ -346,11 +346,6 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
                 icon={Icon.Shield}
                 target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
               />
-              <Action.Push
-                title="Configure Security Question"
-                icon={Icon.Shield}
-                target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
-              />
               <Action
                 title="Lock Vault Now"
                 icon={Icon.Lock}

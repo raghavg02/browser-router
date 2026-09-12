@@ -44,7 +44,8 @@ export function VaultResetPasswordView({ onResetSuccess }: VaultResetPasswordVie
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | undefined>();
   const [newHint, setNewHint] = useState("");
 
-  // Optional: New/Updated Security Question
+  // Optional update security question checkbox
+  const [showUpdateQuestion, setShowUpdateQuestion] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(PRESET_SECURITY_QUESTIONS[0]);
   const [customQuestion, setCustomQuestion] = useState("");
   const [newSecurityAnswer, setNewSecurityAnswer] = useState("");
@@ -175,7 +176,7 @@ export function VaultResetPasswordView({ onResetSuccess }: VaultResetPasswordVie
       isLoading={isSubmitting}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Reset & Re-Encrypt Vault" icon={Icon.Key} onSubmit={handleReset} />
+          <Action.SubmitForm title="Reset Master Password" icon={Icon.Key} onSubmit={handleReset} />
         </ActionPanel>
       }
     >
@@ -269,31 +270,85 @@ export function VaultResetPasswordView({ onResetSuccess }: VaultResetPasswordVie
         onChange={setNewHint}
       />
 
-      <Form.Separator />
+      {/* Only show security question fields if NOT already configured, or if the user explicitly checks to update */}
+      {!hasConfiguredSecQuestion && (
+        <>
+          <Form.Separator />
+          <Form.Dropdown
+            id="newQuestion"
+            title="Set Recovery Question (Optional)"
+            value={selectedQuestion}
+            onChange={setSelectedQuestion}
+          >
+            {PRESET_SECURITY_QUESTIONS.map((q) => (
+              <Form.Dropdown.Item key={q} value={q} title={q} />
+            ))}
+          </Form.Dropdown>
 
-      <Form.Dropdown id="newQuestion" title="Recovery Question" value={selectedQuestion} onChange={setSelectedQuestion}>
-        {PRESET_SECURITY_QUESTIONS.map((q) => (
-          <Form.Dropdown.Item key={q} value={q} title={q} />
-        ))}
-      </Form.Dropdown>
+          {selectedQuestion === "Custom Security Question..." && (
+            <Form.TextField
+              id="customQuestion"
+              title="Custom Question"
+              placeholder="e.g. What was the name of your first school?"
+              value={customQuestion}
+              onChange={setCustomQuestion}
+            />
+          )}
 
-      {selectedQuestion === "Custom Security Question..." && (
-        <Form.TextField
-          id="customQuestion"
-          title="Custom Question"
-          placeholder="e.g. What was the name of your first school?"
-          value={customQuestion}
-          onChange={setCustomQuestion}
-        />
+          <Form.TextField
+            id="newSecurityAnswer"
+            title="Security Answer"
+            placeholder="Answer for future password recovery"
+            value={newSecurityAnswer}
+            onChange={setNewSecurityAnswer}
+          />
+        </>
       )}
 
-      <Form.TextField
-        id="newSecurityAnswer"
-        title="Security Answer"
-        placeholder="Answer for future password recovery"
-        value={newSecurityAnswer}
-        onChange={setNewSecurityAnswer}
-      />
+      {hasConfiguredSecQuestion && resetMethod === "old_password" && (
+        <>
+          <Form.Separator />
+          <Form.Checkbox
+            id="changeQuestion"
+            label="Change configured security question"
+            value={showUpdateQuestion}
+            onChange={setShowUpdateQuestion}
+          />
+
+          {showUpdateQuestion && (
+            <>
+              <Form.Dropdown
+                id="newQuestion"
+                title="New Recovery Question"
+                value={selectedQuestion}
+                onChange={setSelectedQuestion}
+              >
+                {PRESET_SECURITY_QUESTIONS.map((q) => (
+                  <Form.Dropdown.Item key={q} value={q} title={q} />
+                ))}
+              </Form.Dropdown>
+
+              {selectedQuestion === "Custom Security Question..." && (
+                <Form.TextField
+                  id="customQuestion"
+                  title="Custom Question"
+                  placeholder="e.g. What was the name of your first school?"
+                  value={customQuestion}
+                  onChange={setCustomQuestion}
+                />
+              )}
+
+              <Form.TextField
+                id="newSecurityAnswer"
+                title="New Security Answer"
+                placeholder="Answer for future password recovery"
+                value={newSecurityAnswer}
+                onChange={setNewSecurityAnswer}
+              />
+            </>
+          )}
+        </>
+      )}
     </Form>
   );
 }
