@@ -1,10 +1,12 @@
+import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import { LocalStorage, environment } from "@raycast/api";
+import { LocalStorage, environment, open } from "@raycast/api";
 import { VaultItem, VaultMetadata, VaultAttachment, EncryptedPayload } from "../types/vault";
 import {
   generateSalt,
   deriveKey,
+  deriveKeyAsync,
   encryptText,
   decryptText,
   encryptBuffer,
@@ -243,4 +245,69 @@ export async function resetVaultEntirely(): Promise<void> {
     }
   }
   cleanTempVaultFiles();
+}
+
+export async function tryUnlockVault(password: string, cachedMetadata?: VaultMetadata | null): Promise<Buffer | null> {
+  if (!password || !password.trim()) return null;
+  const metadata = cachedMetadata || (await getVaultMetadata());
+  if (!metadata) return null;
+
+  try {
+    const key = await deriveKeyAsync(password, metadata.salt);
+    const decryptedCanary = decryptText(metadata.canary, key);
+    if (decryptedCanary === CANARY_TEXT) {
+      return key;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function openAttachment(
+  attachment: VaultAttachment,
+  key: Buffer,
+  specificApp?: string,
+): Promise<{ success: boolean; path?: string; error?: string }> {
+  const filePath = getDecryptedAttachmentPath(attachment, key);
+  if (!filePath) {
+    return { success: false, error: "Failed to decrypt attachment file" };
+  }
+
+  const app = (specificApp || attachment.customAppPath || "").trim();
+  try {
+    if (app) {
+      // Launch using specific user-configured executable
+      const child = spawn("cmd.exe", ["/c", "start", '""', `"${app}"`, `"${filePath}"`], {
+        windowsVerbatimArguments: true,
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+    } else {
+      // Launch with Windows default application
+      await open(filePath);
+    }
+    return { success: true, path: filePath };
+  } catch (err) {
+    return { success: false, error: String(err), path: filePath };
+  }
+}
+
+export async function updateAttachmentCustomApp(
+  itemId: string,
+  attachmentId: string,
+  customAppPath: string | undefined,
+  key: Buffer,
+): Promise<void> {
+  const items = await getVaultItems(key);
+  const itemIndex = items.findIndex((i) => i.id === itemId);
+  if (itemIndex === -1) return;
+
+  const attIndex = items[itemIndex].attachments.findIndex((a) => a.id === attachmentId);
+  if (attIndex === -1) return;
+
+  items[itemIndex].attachments[attIndex].customAppPath = customAppPath ? customAppPath.trim() : undefined;
+  items[itemIndex].updatedAt = Date.now();
+  await saveVaultItems(items, key);
 }

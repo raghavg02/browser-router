@@ -11,6 +11,7 @@ export interface VaultAttachment {
   mimeType: string;
   encryptedFileName: string;
   createdAt: number;
+  customAppPath?: string;
 }
 
 export interface VaultItem {

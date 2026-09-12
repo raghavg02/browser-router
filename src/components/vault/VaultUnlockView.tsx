@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Form, ActionPanel, Action, showToast, Toast, Icon } from "@raycast/api";
-import { isVaultSetup, getVaultMetadata, setupVault, unlockVault } from "../../utils/vaultStorage";
+import { isVaultSetup, getVaultMetadata, setupVault, unlockVault, tryUnlockVault } from "../../utils/vaultStorage";
+import { VaultMetadata } from "../../types/vault";
 
 interface VaultUnlockViewProps {
   onUnlocked: (key: Buffer) => void;
@@ -11,11 +12,14 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordHint, setPasswordHint] = useState("");
-  const [storedHint, setStoredHint] = useState<string | undefined>();
+  const [storedMetadata, setStoredMetadata] = useState<VaultMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [confirmError, setConfirmError] = useState<string | undefined>();
+
+  const isUnlockingRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     async function checkState() {
@@ -23,12 +27,44 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
       setIsSetup(setup);
       if (setup) {
         const meta = await getVaultMetadata();
-        setStoredHint(meta?.passwordHint);
+        setStoredMetadata(meta);
       }
       setIsLoading(false);
     }
     checkState();
   }, []);
+
+  // Automatic unlock as the user types without pressing Enter / Ctrl+Enter
+  function handlePasswordChange(val: string) {
+    setPassword(val);
+    if (passwordError) setPasswordError(undefined);
+
+    if (isSetup !== true || !val.trim() || isUnlockingRef.current) {
+      return;
+    }
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Debounce slightly to allow natural typing speed, then check canary asynchronously
+    debounceTimerRef.current = setTimeout(async () => {
+      if (isUnlockingRef.current) return;
+      try {
+        const key = await tryUnlockVault(val, storedMetadata);
+        if (key && !isUnlockingRef.current) {
+          isUnlockingRef.current = true;
+          await showToast({
+            style: Toast.Style.Success,
+            title: "Vault Unlocked",
+          });
+          onUnlocked(key);
+        }
+      } catch {
+        // password incomplete, ignore silently
+      }
+    }, 150);
+  }
 
   async function handleSetup() {
     setPasswordError(undefined);
@@ -60,7 +96,8 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
     }
   }
 
-  async function handleUnlock() {
+  async function handleManualUnlock() {
+    if (isUnlockingRef.current) return;
     setPasswordError(undefined);
     if (!password.trim()) {
       setPasswordError("Please enter your master password");
@@ -78,6 +115,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
       return;
     }
 
+    isUnlockingRef.current = true;
     await showToast({
       style: Toast.Style.Success,
       title: "Vault Unlocked",
@@ -135,11 +173,13 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
     );
   }
 
+  const storedHint = storedMetadata?.passwordHint;
+
   return (
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Unlock Vault" icon={Icon.LockUnlocked} onSubmit={handleUnlock} />
+          <Action.SubmitForm title="Unlock Vault" icon={Icon.LockUnlocked} onSubmit={handleManualUnlock} />
         </ActionPanel>
       }
     >
@@ -147,20 +187,17 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         title="🔒 Vault is Locked"
         text={
           storedHint
-            ? `Enter your master password to decrypt and open your private items.\n\n💡 Password Hint: ${storedHint}`
-            : "Enter your master password or PIN to decrypt your private items."
+            ? `Enter your master password or PIN to decrypt your private items. It will unlock automatically once entered!\n\n💡 Password Hint: ${storedHint}`
+            : "Enter your master password or PIN to decrypt your private items. It will unlock automatically once entered!"
         }
       />
       <Form.PasswordField
         id="password"
         title="Master Password"
-        placeholder="Enter your password / PIN"
+        placeholder="Enter your password / PIN (auto-unlocks)"
         value={password}
         error={passwordError}
-        onChange={(val) => {
-          setPassword(val);
-          if (passwordError) setPasswordError(undefined);
-        }}
+        onChange={handlePasswordChange}
       />
     </Form>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
+import path from "path";
 import { List, ActionPanel, Action, Icon, Color, showToast, Toast, confirmAlert, Alert, Keyboard } from "@raycast/api";
-import { VaultItem } from "../../types/vault";
+import { VaultItem, VaultAttachment } from "../../types/vault";
 import { BrowserProfile } from "../../types";
 import {
   getVaultItems,
@@ -9,12 +10,13 @@ import {
   updateVaultCategories,
   DEFAULT_CATEGORIES,
   cleanTempVaultFiles,
-  getDecryptedAttachmentPath,
+  openAttachment,
+  updateAttachmentCustomApp,
 } from "../../utils/vaultStorage";
 import { detectInstalledProfiles } from "../../utils/browserDetector";
 import { launchBrowserProfile } from "../../utils/launcher";
 import { VaultItemForm } from "./VaultItemForm";
-import { VaultFileViewer } from "./VaultFileViewer";
+import { SetCustomAppForm } from "./SetCustomAppForm";
 
 interface VaultMainViewProps {
   vaultKey: Buffer;
@@ -28,7 +30,7 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Clean temp decrypted files on unmount
+  // Clean temp decrypted files on unmount/lock
   useEffect(() => {
     return () => {
       cleanTempVaultFiles();
@@ -74,7 +76,6 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
     setItems(newItems);
     await saveVaultItems(newItems, vaultKey);
 
-    // If new custom category, record it
     if (updatedItem.category && !categories.includes(updatedItem.category)) {
       const newCats = [...categories, updatedItem.category];
       setCategories(newCats);
@@ -94,14 +95,21 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
 
     if (!confirmed) return;
 
-    const newItems = items.filter((i) => i.id !== item.id);
-    setItems(newItems);
-    await saveVaultItems(newItems, vaultKey);
-    await showToast({
-      style: Toast.Style.Success,
-      title: "Item Deleted",
-      message: `"${item.title}" was removed from the vault.`,
-    });
+    try {
+      const newItems = items.filter((i) => i.id !== item.id);
+      setItems(newItems);
+      await saveVaultItems(newItems, vaultKey);
+      await showToast({
+        style: Toast.Style.Success,
+        title: "Vault Item Deleted",
+      });
+    } catch (err) {
+      await showToast({
+        style: Toast.Style.Failure,
+        title: "Failed to delete item",
+        message: String(err),
+      });
+    }
   }
 
   async function handleToggleFavorite(itemId: string) {
@@ -110,38 +118,60 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
     await saveVaultItems(newItems, vaultKey);
   }
 
-  async function handleLaunch(item: VaultItem, incognito = false) {
-    if (!item.url) {
+  async function handleLaunch(item: VaultItem, isPrivate = false) {
+    if (!item.url) return;
+
+    let profile = profiles.find((p) => p.id === item.preferredProfileId);
+    if (!profile && profiles.length > 0) {
+      profile = profiles[0];
+    }
+
+    if (!profile) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "No URL assigned",
-        message: "This item only contains secret notes or documents.",
+        title: "No browser profiles detected",
       });
       return;
     }
 
-    let targetProfile = profiles.find((p) => p.id === item.preferredProfileId);
-    if (!targetProfile) {
-      // Fallback to first detected profile (e.g. Chrome Default or Edge)
-      targetProfile = profiles[0];
-    }
-
-    if (!targetProfile) {
+    try {
+      await launchBrowserProfile(profile, item.url, isPrivate);
+      await showToast({
+        style: Toast.Style.Success,
+        title: `Opened in ${profile.displayName}`,
+        message: item.url,
+      });
+    } catch (err) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "No browser profile found",
-        message: "Could not locate an installed browser to launch this URL.",
+        title: "Failed to launch URL",
+        message: String(err),
       });
-      return;
     }
-
-    await launchBrowserProfile(targetProfile, item.url, incognito);
   }
 
-  function getAssignedProfileName(profileId?: string): string {
-    if (!profileId) return "Default / Unassigned";
-    const p = profiles.find((prof) => prof.id === profileId);
-    return p ? p.displayName : profileId;
+  async function handleOpenAttachment(att: VaultAttachment) {
+    const appLabel = att.customAppPath ? path.basename(att.customAppPath) : "default app";
+    await showToast({ style: Toast.Style.Animated, title: `Decrypting and opening in ${appLabel}...` });
+    const res = await openAttachment(att, vaultKey);
+    if (!res.success) {
+      await showToast({ style: Toast.Style.Failure, title: "Failed to open file", message: res.error });
+    } else {
+      await showToast({ style: Toast.Style.Success, title: `Opened in ${appLabel}` });
+    }
+  }
+
+  async function handleSetCustomApp(itemId: string, attachmentId: string, customAppPath: string | undefined) {
+    await updateAttachmentCustomApp(itemId, attachmentId, customAppPath, vaultKey);
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id !== itemId) return item;
+        return {
+          ...item,
+          attachments: item.attachments.map((a) => (a.id === attachmentId ? { ...a, customAppPath } : a)),
+        };
+      }),
+    );
   }
 
   const filteredItems = useMemo(() => {
@@ -153,52 +183,31 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   const nonFavorites = useMemo(() => filteredItems.filter((i) => !i.isFavorite), [filteredItems]);
 
   function renderItemDetail(item: VaultItem) {
-    const profileName = getAssignedProfileName(item.preferredProfileId);
-    const hasAttachments = item.attachments && item.attachments.length > 0;
+    const profile = profiles.find((p) => p.id === item.preferredProfileId);
+    const profileName = profile ? profile.displayName : "Default System Browser";
 
-    let md = `# ${item.title}
+    let md = `# ${item.title}\n\n`;
 
-`;
     if (item.url) {
-      md += `🔗 **URL:** [${item.url}](${item.url})\n\n`;
+      md += `**🔗 Destination URL:** [${item.url}](${item.url})\n\n`;
     }
-
-    md += `🏷️ **Category:** *${item.category}* | 🌐 **Browser Profile:** *${profileName}*\n\n`;
 
     if (item.notes) {
-      md += `### 📝 Secret Notes & Text
-${item.notes}
-
-`;
+      md += `### 📝 Secret Notes\n${item.notes}\n\n`;
     }
 
-    if (hasAttachments) {
-      md += `### 📎 Encrypted Attachments (${item.attachments.length})
-`;
+    if (item.attachments && item.attachments.length > 0) {
+      md += `### 📎 Attached Encrypted Files\n`;
       for (const att of item.attachments) {
-        const ext = att.name.split(".").pop()?.toLowerCase() || "";
-        const isImg = ["png", "jpg", "jpeg", "webp", "gif"].includes(ext);
-
-        if (isImg) {
-          const tempPath = getDecryptedAttachmentPath(att, vaultKey);
-          if (tempPath) {
-            const uri = `file:///${tempPath.replace(/\\/g, "/")}`;
-            md += `**${att.name}** (${(att.size / 1024).toFixed(1)} KB)\n![${att.name}](${uri})\n\n`;
-          } else {
-            md += `• 🖼️ ${att.name} (${(att.size / 1024).toFixed(1)} KB)\n`;
-          }
-        } else if (ext === "pdf") {
-          md += `• 📑 **${att.name}** (${(att.size / 1024).toFixed(1)} KB) — *Press Space to View*\n`;
-        } else {
-          md += `• 📄 **${att.name}** (${(att.size / 1024).toFixed(1)} KB)\n`;
-        }
+        const openerInfo = att.customAppPath
+          ? " *(Opens in: " + att.customAppPath + ")*"
+          : " *(Opens in Windows default app)*";
+        md += `• **${att.name}** (${(att.size / 1024).toFixed(1)} KB)${openerInfo}\n`;
       }
+      md += `\n*💡 Press **Enter** to decrypt and open in its configured viewer.*\n`;
     }
 
-    md += `
----
-*Added: ${new Date(item.createdAt).toLocaleDateString()}*
-`;
+    md += `\n---\n*Added: ${new Date(item.createdAt).toLocaleDateString()}*\n`;
 
     return (
       <List.Item.Detail
@@ -247,6 +256,32 @@ ${item.notes}
         detail={renderItemDetail(item)}
         actions={
           <ActionPanel>
+            {hasAttachments && firstAttachment ? (
+              <ActionPanel.Section title="File Opener">
+                <Action
+                  title={
+                    firstAttachment.customAppPath
+                      ? `Open in ${path.basename(firstAttachment.customAppPath)}`
+                      : `Open "${firstAttachment.name}" in Default App`
+                  }
+                  icon={Icon.Document}
+                  onAction={() => handleOpenAttachment(firstAttachment)}
+                />
+                <Action.Push
+                  title="Configure Custom App for File…"
+                  icon={Icon.Gear}
+                  shortcut={Keyboard.Shortcut.Common.Open}
+                  target={
+                    <SetCustomAppForm
+                      item={item}
+                      attachment={firstAttachment}
+                      onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
+                    />
+                  }
+                />
+              </ActionPanel.Section>
+            ) : null}
+
             {item.url ? (
               <ActionPanel.Section title="Launch Destination">
                 <Action
@@ -259,17 +294,6 @@ ${item.notes}
                   icon={Icon.EyeSlash}
                   shortcut={{ modifiers: ["ctrl"], key: "enter" }}
                   onAction={() => handleLaunch(item, true)}
-                />
-              </ActionPanel.Section>
-            ) : null}
-
-            {firstAttachment ? (
-              <ActionPanel.Section title="Attachment Viewer">
-                <Action.Push
-                  title={`View Attachment (${firstAttachment.name})`}
-                  icon={Icon.Eye}
-                  shortcut={{ modifiers: [], key: "space" }}
-                  target={<VaultFileViewer attachment={firstAttachment} vaultKey={vaultKey} />}
                 />
               </ActionPanel.Section>
             ) : null}

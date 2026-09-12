@@ -1,3 +1,4 @@
+import util from "util";
 import crypto from "crypto";
 import { EncryptedPayload } from "../types/vault";
 
@@ -20,6 +21,18 @@ export function generateSalt(): string {
 /**
  * Derive a 256-bit AES key from a user master password and salt using PBKDF2
  */
+
+const pbkdf2Async = util.promisify(crypto.pbkdf2);
+
+/**
+ * Derive a 256-bit AES key asynchronously (non-blocking for background auto-unlock check)
+ */
+export async function deriveKeyAsync(password: string, saltHex: string): Promise<Buffer> {
+  const salt = Buffer.from(saltHex, "hex");
+  const key = await pbkdf2Async(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, PBKDF2_DIGEST);
+  return key as Buffer;
+}
+
 export function deriveKey(password: string, saltHex: string): Buffer {
   const salt = Buffer.from(saltHex, "hex");
   return crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH, PBKDF2_DIGEST);

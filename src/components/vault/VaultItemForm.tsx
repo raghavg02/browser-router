@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import path from "path";
 import { Form, ActionPanel, Action, useNavigation, showToast, Toast, Icon } from "@raycast/api";
 import { VaultItem, VaultAttachment } from "../../types/vault";
 import { BrowserProfile } from "../../types";
@@ -23,9 +24,9 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
   const [notes, setNotes] = useState(initialItem?.notes || "");
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<VaultAttachment[]>(initialItem?.attachments || []);
+  const [customAppPath, setCustomAppPath] = useState(initialItem?.attachments?.[0]?.customAppPath || "");
 
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
-  const [titleError, setTitleError] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -40,7 +41,6 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
     loadProfiles();
   }, []);
 
-  // Helper reserved for deleting individual attachments in edit mode
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function handleRemoveExistingAttachment(attId: string) {
     const att = existingAttachments.find((a) => a.id === attId);
@@ -51,23 +51,51 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
   }
 
   async function handleSubmit() {
-    setTitleError(undefined);
-    if (!title.trim()) {
-      setTitleError("Title is required");
-      return;
-    }
-
     setIsSaving(true);
     await showToast({ style: Toast.Style.Animated, title: "Encrypting and saving item..." });
 
     try {
-      const finalCategory = category === "__custom__" ? customCategory.trim() || "General" : category;
-      const newAttachments: VaultAttachment[] = [...existingAttachments];
+      // Auto-generate title if left blank by user
+      let finalTitle = title.trim();
+      if (!finalTitle) {
+        if (selectedFiles.length > 0) {
+          finalTitle = path.basename(selectedFiles[0]);
+        } else if (existingAttachments.length > 0) {
+          finalTitle = existingAttachments[0].name;
+        } else if (url.trim()) {
+          try {
+            const parsed = new URL(url.trim().startsWith("http") ? url.trim() : "https://" + url.trim());
+            finalTitle = parsed.hostname.replace(/^www\./, "");
+          } catch {
+            finalTitle = url.trim();
+          }
+        } else if (notes.trim()) {
+          const firstLine = notes
+            .trim()
+            .split("\n")[0]
+            .replace(/^[#*\- >]+/, "")
+            .trim();
+          finalTitle = firstLine
+            ? firstLine.length > 40
+              ? firstLine.substring(0, 37) + "..."
+              : firstLine
+            : "Secret Note";
+        } else {
+          finalTitle = "Untitled Item";
+        }
+      }
 
-      // Encrypt each new attached file
+      const finalCategory = category === "__custom__" ? customCategory.trim() || "General" : category;
+      const newAttachments: VaultAttachment[] = existingAttachments.map((att) => ({
+        ...att,
+        customAppPath: customAppPath.trim() || undefined,
+      }));
+
+      // Encrypt each newly selected file
       for (const filePath of selectedFiles) {
         try {
           const att = await saveAttachment(filePath, vaultKey);
+          att.customAppPath = customAppPath.trim() || undefined;
           newAttachments.push(att);
         } catch (err) {
           console.error("Failed to encrypt attachment:", filePath, err);
@@ -76,7 +104,7 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
 
       const item: VaultItem = {
         id: initialItem?.id || "vault_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
-        title: title.trim(),
+        title: finalTitle,
         url: url.trim() || undefined,
         category: finalCategory,
         preferredProfileId: preferredProfileId || undefined,
@@ -119,14 +147,10 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
     >
       <Form.TextField
         id="title"
-        title="Title"
-        placeholder="e.g. Staging Portal, Bank Account, AWS Console"
+        title="Title (Optional)"
+        placeholder="Leave blank to use file name or URL"
         value={title}
-        error={titleError}
-        onChange={(val) => {
-          setTitle(val);
-          if (titleError) setTitleError(undefined);
-        }}
+        onChange={setTitle}
       />
 
       <Form.TextField
@@ -187,12 +211,26 @@ export function VaultItemForm({ initialItem, vaultKey, categories, onSave }: Vau
       />
       <Form.Description text="Attach screenshots, photos, PDF documents, or text files. All files are encrypted with AES-256-GCM." />
 
+      <Form.TextField
+        id="customAppPath"
+        title="Custom Opening App (Optional)"
+        placeholder="e.g. mspaint.exe, vlc.exe, notepad.exe, code.cmd (or leave empty for Windows default)"
+        value={customAppPath}
+        onChange={setCustomAppPath}
+      />
+      <Form.Description text="Leave empty to open with default Windows app, or specify an executable name / path." />
+
       {existingAttachments.length > 0 ? (
         <>
           <Form.Separator />
           <Form.Description
             title="Attached Encrypted Files"
-            text={existingAttachments.map((a) => `• ${a.name} (${(a.size / 1024).toFixed(1)} KB)`).join("\n")}
+            text={existingAttachments
+              .map((a) => {
+                const appInfo = a.customAppPath ? ` [Opens in: ${a.customAppPath}]` : " [Windows Default App]";
+                return `• ${a.name} (${(a.size / 1024).toFixed(1)} KB)${appInfo}`;
+              })
+              .join("\n")}
           />
         </>
       ) : null}
