@@ -82,70 +82,6 @@ function getCleanBrowserEnv(): NodeJS.ProcessEnv {
   return cleanEnv;
 }
 
-function launchViaWmi(executablePath: string, args: string[], cwd?: string): Promise<boolean> {
-  const formattedArgs = args.map((a) => (a.includes(" ") && !a.startsWith('"') ? `"${a}"` : a));
-  const fullCmd = `"${executablePath}"` + (formattedArgs.length > 0 ? " " + formattedArgs.join(" ") : "");
-
-  // Launch via WMI Win32_Process.Create using cscript.
-  // WMI delegates process creation directly to WmiPrvSE.exe, a top-level Windows OS service.
-  // This completely decouples Chrome from the parent Electron / IDE terminal process tree and Job Objects,
-  // preventing Google Chrome Elevation Service from detecting an untrusted caller and breaking cookie encryption.
-  const scriptContent = [
-    'var wmi = GetObject("winmgmts:\\\\.\\root\\cimv2");',
-    'var proc = wmi.Get("Win32_Process");',
-    "var pid = 0;",
-    "var cmd = " + JSON.stringify(fullCmd) + ";",
-    "var dir = " + JSON.stringify(cwd || null) + ";",
-    "var res = proc.Create(cmd, dir, null, pid);",
-    "WScript.Quit(res);",
-  ].join("\r\n");
-
-  const tempScript = path.join(
-    process.env.TEMP || "C:\\Windows\\Temp",
-    `wmi_launch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.js`,
-  );
-
-  try {
-    fs.writeFileSync(tempScript, scriptContent, "utf8");
-  } catch {
-    return Promise.resolve(false);
-  }
-
-  return new Promise((resolve) => {
-    try {
-      const child = spawn("cscript.exe", ["//nologo", "//E:jscript", tempScript], {
-        windowsHide: true,
-        stdio: "ignore",
-      });
-
-      child.once("exit", (exitCode) => {
-        try {
-          fs.unlinkSync(tempScript);
-        } catch {
-          // ignore
-        }
-        resolve(exitCode === 0);
-      });
-
-      child.once("error", () => {
-        try {
-          fs.unlinkSync(tempScript);
-        } catch {
-          // ignore
-        }
-        resolve(false);
-      });
-    } catch {
-      try {
-        fs.unlinkSync(tempScript);
-      } catch {
-        // ignore
-      }
-      resolve(false);
-    }
-  });
-}
-
 export async function launchBrowserProfile(
   profile: BrowserProfile,
   targetUrl?: string,
@@ -245,27 +181,13 @@ export async function launchBrowserProfile(
       }
     }
 
-    // On Windows, delegate process creation to WMI (WmiPrvSE.exe).
-    // WmiPrvSE is an independent Windows OS service that creates processes directly in the user's
-    // interactive desktop session without inheriting Electron / IDE terminal Job Objects or crashpad handles.
-    // This allows Google Chrome's App-Bound Encryption service to authenticate the caller and preserve all cookie logins.
-    if (process.platform === "win32") {
-      const wmiSuccess = await launchViaWmi(profile.executablePath, args, fs.existsSync(exeDir) ? exeDir : undefined);
-      if (wmiSuccess) {
-        const modeText = incognito ? " (Incognito)" : "";
-        await showToast({
-          style: Toast.Style.Success,
-          title: `Opened in ${profile.displayName}${modeText}`,
-          message: targetUrl ? (targetUrl.length > 50 ? targetUrl.substring(0, 47) + "..." : targetUrl) : undefined,
-        });
-        await closeMainWindow();
-        return true;
-      }
-    }
-
-    // Fallback: standard spawn with sanitized environment
+    // Clean environment to prevent foreign Electron, IDE, or crashpad variables from polluting browser processes.
+    // An allowlist ensures spawned browsers only receive standard Windows OS environment variables.
     const cleanEnv = getCleanBrowserEnv();
 
+    // On Windows, launching via 'cmd.exe /c start' delegates process creation to the Windows Shell (explorer.exe).
+    // This runs the browser with the user's interactive desktop session token rather than inheriting the parent
+    // Electron/MSIX container token, ensuring Google Chrome's App-Bound Encryption can decrypt persistent cookies.
     const child =
       process.platform === "win32"
         ? spawn(
