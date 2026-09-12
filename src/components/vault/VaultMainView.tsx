@@ -11,6 +11,7 @@ import {
   DEFAULT_CATEGORIES,
   cleanTempVaultFiles,
   openAttachment,
+  getDecryptedAttachmentPath,
   updateAttachmentCustomApp,
 } from "../../utils/vaultStorage";
 import { detectInstalledProfiles } from "../../utils/browserDetector";
@@ -150,10 +151,11 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
     }
   }
 
-  async function handleOpenAttachment(att: VaultAttachment) {
-    const appLabel = att.customAppPath ? path.basename(att.customAppPath) : "default app";
-    await showToast({ style: Toast.Style.Animated, title: `Decrypting and opening in ${appLabel}...` });
-    const res = await openAttachment(att, vaultKey);
+  async function handleOpenAttachment(att: VaultAttachment, specificApp?: string) {
+    const targetApp = specificApp !== undefined ? specificApp : att.customAppPath;
+    const appLabel = targetApp ? path.basename(targetApp) : "Windows default app";
+    await showToast({ style: Toast.Style.Animated, title: `Opening in ${appLabel}...` });
+    const res = await openAttachment(att, vaultKey, specificApp);
     if (!res.success) {
       await showToast({ style: Toast.Style.Failure, title: "Failed to open file", message: res.error });
     } else {
@@ -268,13 +270,31 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
                   onAction={() => handleOpenAttachment(firstAttachment)}
                 />
                 <Action.Push
-                  title="Configure Custom App for File…"
+                  title="Open in App Once…"
+                  icon={Icon.ArrowRight}
+                  shortcut={Keyboard.Shortcut.Common.OpenWith}
+                  target={
+                    <SetCustomAppForm
+                      item={item}
+                      attachment={firstAttachment}
+                      mode="open_once"
+                      onOpenOnce={(app) => handleOpenAttachment(firstAttachment, app)}
+                    />
+                  }
+                />
+                <Action.OpenWith
+                  title="Open with (System Dialog)…"
+                  path={getDecryptedAttachmentPath(firstAttachment, vaultKey) || ""}
+                />
+                <Action.Push
+                  title="Set Custom App for File…"
                   icon={Icon.Gear}
                   shortcut={Keyboard.Shortcut.Common.Open}
                   target={
                     <SetCustomAppForm
                       item={item}
                       attachment={firstAttachment}
+                      mode="set_default"
                       onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
                     />
                   }

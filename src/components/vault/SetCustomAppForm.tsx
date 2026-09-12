@@ -5,7 +5,10 @@ import { VaultItem, VaultAttachment } from "../../types/vault";
 interface SetCustomAppFormProps {
   item: VaultItem;
   attachment: VaultAttachment;
-  onSaved: (appPath: string | undefined) => Promise<void>;
+  mode?: "set_default" | "open_once";
+  vaultKey?: Buffer;
+  onSaved?: (appPath: string | undefined) => Promise<void>;
+  onOpenOnce?: (appPath: string | undefined) => Promise<void>;
 }
 
 const COMMON_APPS = [
@@ -19,8 +22,16 @@ const COMMON_APPS = [
   { id: "__custom__", title: "Custom Executable Path…" },
 ];
 
-export function SetCustomAppForm({ item, attachment, onSaved }: SetCustomAppFormProps) {
+export function SetCustomAppForm({
+  item,
+  attachment,
+  mode = "set_default",
+  onSaved,
+  onOpenOnce,
+}: SetCustomAppFormProps) {
   const { pop } = useNavigation();
+
+  const isOneTime = mode === "open_once";
 
   const initialPreset = COMMON_APPS.find((a) => a.id === (attachment.customAppPath || ""))
     ? attachment.customAppPath || ""
@@ -32,10 +43,10 @@ export function SetCustomAppForm({ item, attachment, onSaved }: SetCustomAppForm
   const [customPath, setCustomPath] = useState<string>(
     initialPreset === "__custom__" ? attachment.customAppPath || "" : "",
   );
-  const [isSaving, setIsSaving] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   async function handleSubmit() {
-    setIsSaving(true);
+    setIsProcessing(true);
     let chosenApp: string | undefined = undefined;
 
     if (selectedPreset === "__custom__") {
@@ -45,36 +56,53 @@ export function SetCustomAppForm({ item, attachment, onSaved }: SetCustomAppForm
     }
 
     try {
-      await onSaved(chosenApp);
-      await showToast({
-        style: Toast.Style.Success,
-        title: "Opening App Updated",
-        message: chosenApp ? `Configured to open in ${chosenApp}` : "Reset to Windows Default App",
-      });
-      pop();
+      if (isOneTime) {
+        if (onOpenOnce) {
+          await onOpenOnce(chosenApp);
+        }
+        pop();
+      } else {
+        if (onSaved) {
+          await onSaved(chosenApp);
+        }
+        await showToast({
+          style: Toast.Style.Success,
+          title: "Opening App Updated",
+          message: chosenApp ? `Configured to open in ${chosenApp}` : "Reset to Windows Default App",
+        });
+        pop();
+      }
     } catch (err) {
       await showToast({
         style: Toast.Style.Failure,
-        title: "Failed to update app",
+        title: isOneTime ? "Failed to open file" : "Failed to update app",
         message: String(err),
       });
     } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
     }
   }
 
   return (
     <Form
-      isLoading={isSaving}
+      isLoading={isProcessing}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Save App Preference" icon={Icon.Check} onSubmit={handleSubmit} />
+          <Action.SubmitForm
+            title={isOneTime ? "Open File with Selected App" : "Save App Preference"}
+            icon={isOneTime ? Icon.ArrowRight : Icon.Check}
+            onSubmit={handleSubmit}
+          />
         </ActionPanel>
       }
     >
       <Form.Description
-        title={`Configure Opener for "${attachment.name}"`}
-        text={`Item: "${item.title}"\nChoose which application should open this encrypted file when launched.`}
+        title={isOneTime ? `Open "${attachment.name}" with… (One Time)` : `Configure Opener for "${attachment.name}"`}
+        text={
+          isOneTime
+            ? `Choose an application to open this file right now. This will NOT change your saved default application.`
+            : `Item: "${item.title}"\nChoose which application should open this encrypted file by default every time you press Enter.`
+        }
       />
 
       <Form.Dropdown
@@ -103,7 +131,13 @@ export function SetCustomAppForm({ item, attachment, onSaved }: SetCustomAppForm
         />
       ) : null}
 
-      <Form.Description text="When you open this file, Raycast will decrypt it to secure temporary storage and launch it directly in this app." />
+      <Form.Description
+        text={
+          isOneTime
+            ? "Raycast will decrypt this file to temporary storage and launch it immediately in your chosen application."
+            : "When you press Enter on this item, Raycast will decrypt it and launch it directly in this app."
+        }
+      />
     </Form>
   );
 }
