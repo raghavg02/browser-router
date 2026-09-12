@@ -82,6 +82,80 @@ function getCleanBrowserEnv(): NodeJS.ProcessEnv {
   return cleanEnv;
 }
 
+function launchViaExplorerShell(executablePath: string, args: string[], cwd?: string): Promise<boolean> {
+  const formattedArgs = args.map((a) => (a.includes(" ") && !a.startsWith('"') ? `"${a}"` : a));
+  const argsString = formattedArgs.join(" ");
+
+  // Delegates process creation directly to explorer.exe (Windows Desktop Shell).
+  // By using IShellWindows.FindWindowSW, explorer.exe itself calls ShellExecute.
+  // This guarantees:
+  // 1. The browser process is a direct child of explorer.exe, not Node/Raycast/IDE.
+  // 2. Completely detached from any IDE terminal Job Objects or container virtualization.
+  // 3. Runs with the user's authentic desktop session token so Chrome's App-Bound Encryption
+  //    (elevation_service.exe) authenticates the caller and preserves all profile cookies and sign-ins.
+  const scriptContent = [
+    'var shell = new ActiveXObject("Shell.Application");',
+    "var desktop = shell.Windows().FindWindowSW(0, 0, 8, 0, 1);",
+    "if (desktop) {",
+    "  desktop.Document.Application.ShellExecute(" +
+      JSON.stringify(executablePath) +
+      ", " +
+      JSON.stringify(argsString) +
+      ", " +
+      JSON.stringify(cwd || "") +
+      ', "open", 1);',
+    "} else {",
+    '  var wsh = new ActiveXObject("WScript.Shell");',
+    "  wsh.Run(" + JSON.stringify('"' + executablePath + '"' + (argsString ? " " + argsString : "")) + ", 1, false);",
+    "}",
+  ].join("\r\n");
+
+  const tempScript = path.join(
+    process.env.TEMP || "C:\\Windows\\Temp",
+    `raycast_launch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.js`,
+  );
+
+  try {
+    fs.writeFileSync(tempScript, scriptContent, "utf8");
+  } catch {
+    return Promise.resolve(false);
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const child = spawn("cscript.exe", ["//nologo", "//E:jscript", tempScript], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+
+      child.once("exit", (exitCode) => {
+        try {
+          fs.unlinkSync(tempScript);
+        } catch {
+          // ignore
+        }
+        resolve(exitCode === 0);
+      });
+
+      child.once("error", () => {
+        try {
+          fs.unlinkSync(tempScript);
+        } catch {
+          // ignore
+        }
+        resolve(false);
+      });
+    } catch {
+      try {
+        fs.unlinkSync(tempScript);
+      } catch {
+        // ignore
+      }
+      resolve(false);
+    }
+  });
+}
+
 export async function launchBrowserProfile(
   profile: BrowserProfile,
   targetUrl?: string,
@@ -181,13 +255,32 @@ export async function launchBrowserProfile(
       }
     }
 
-    // Clean environment to prevent foreign Electron, IDE, or crashpad variables from polluting browser processes.
-    // An allowlist ensures spawned browsers only receive standard Windows OS environment variables.
+    // On Windows, delegate process creation directly to explorer.exe (Windows Desktop Shell).
+    // This ensures the browser is spawned by explorer.exe with the user's desktop session token,
+    // breaking completely away from any IDE terminal Job Objects so Google Chrome App-Bound Encryption
+    // can authenticate the caller and preserve all cookie sign-ins.
+    if (process.platform === "win32") {
+      const shellSuccess = await launchViaExplorerShell(
+        profile.executablePath,
+        args,
+        fs.existsSync(exeDir) ? exeDir : undefined,
+      );
+      if (shellSuccess) {
+        const modeText = incognito ? " (Incognito)" : "";
+        await showToast({
+          style: Toast.Style.Success,
+          title: `Opened in ${profile.displayName}${modeText}`,
+          message: targetUrl ? (targetUrl.length > 50 ? targetUrl.substring(0, 47) + "..." : targetUrl) : undefined,
+        });
+
+        await closeMainWindow();
+        return true;
+      }
+    }
+
+    // Fallback: standard spawn with sanitized environment
     const cleanEnv = getCleanBrowserEnv();
 
-    // On Windows, launching via 'cmd.exe /c start' delegates process creation to the Windows Shell (explorer.exe).
-    // This runs the browser with the user's interactive desktop session token rather than inheriting the parent
-    // Electron/MSIX container token, ensuring Google Chrome's App-Bound Encryption can decrypt persistent cookies.
     const child =
       process.platform === "win32"
         ? spawn(
