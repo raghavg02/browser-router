@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { execFile } from "child_process";
 
 export interface ZipEntryInfo {
@@ -327,10 +329,39 @@ try {
 }
 
 /**
+ * Locates the valid Python executable even when Raycast runs in a GUI sandbox with minimal PATH.
+ */
+export function getPythonExecutable(): string {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const candidates = [
+    path.join(localAppData, "Python", "pythoncore-3.14-64", "python.exe"),
+    path.join(localAppData, "Python", "bin", "python.exe"),
+    path.join(localAppData, "Programs", "Python", "Python314", "python.exe"),
+    path.join(localAppData, "Programs", "Python", "Python313", "python.exe"),
+    path.join(localAppData, "Programs", "Python", "Python312", "python.exe"),
+    path.join(localAppData, "Programs", "Python", "Python311", "python.exe"),
+    path.join(localAppData, "Programs", "Python", "Python310", "python.exe"),
+    "C:\\Python314\\python.exe",
+    "C:\\Python313\\python.exe",
+    "C:\\Python312\\python.exe",
+  ];
+
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      return c;
+    }
+  }
+
+  return "python";
+}
+
+/**
  * Renders Page 1 of any PDF document into a crystal-clear high-res PNG Base64 Data URI.
  */
 export async function renderPdfPageToImage(pdfPath: string): Promise<{ imageUri?: string; pageCount?: number }> {
   return new Promise((resolve) => {
+    const pythonExe = getPythonExecutable();
+    const safePath = pdfPath.replace(/\\/g, "/");
     const py = `import sys, base64
 try:
     import pymupdf
@@ -343,9 +374,9 @@ except Exception as e:
     sys.stderr.write(str(e))
 `;
     execFile(
-      "python",
-      ["-c", py, pdfPath],
-      { timeout: 7000, windowsHide: true, maxBuffer: 20 * 1024 * 1024 },
+      pythonExe,
+      ["-c", py, safePath],
+      { timeout: 8000, windowsHide: true, maxBuffer: 25 * 1024 * 1024 },
       (err, stdout) => {
         if (err || !stdout) return resolve({});
         const out = stdout.trim();

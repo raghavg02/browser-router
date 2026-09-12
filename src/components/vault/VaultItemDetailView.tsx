@@ -82,6 +82,7 @@ export function VaultItemDetailView({
   } | null>(null);
   const [pdfImageUri, setPdfImageUri] = useState<string | null>(null);
   const [pdfPageCount, setPdfPageCount] = useState<number | undefined>(undefined);
+  const [isPdfRendering, setIsPdfRendering] = useState<boolean>(true);
   const [audioMeta, setAudioMeta] = useState<AudioMetaInfo | null>(null);
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
 
@@ -135,11 +136,15 @@ export function VaultItemDetailView({
             // ignore
           }
         } else if (fileCategory === "pdf") {
-          // Render visual page-1 image preview of the PDF
-          renderPdfPageToImage(p).then((res) => {
-            if (res.imageUri) setPdfImageUri(res.imageUri);
-            if (res.pageCount) setPdfPageCount(res.pageCount);
-          });
+          setIsPdfRendering(true);
+          renderPdfPageToImage(p)
+            .then((res) => {
+              if (res.imageUri) setPdfImageUri(res.imageUri);
+              if (res.pageCount) setPdfPageCount(res.pageCount);
+            })
+            .finally(() => {
+              setIsPdfRendering(false);
+            });
         } else if (fileCategory === "video") {
           extractWindowsThumbnail(p).then((thumb) => {
             if (thumb) setThumbnailUri(thumb);
@@ -273,13 +278,13 @@ export function VaultItemDetailView({
         md += `# ${displayTitle}\n\n`;
         if (pdfImageUri) {
           md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${pdfImageUri})\n\n`;
-        } else {
-          md += "*Loading visual PDF document preview...*\n\n";
+        } else if (isPdfRendering) {
+          md += "*Rendering high-resolution document preview...*\n\n";
         }
         const pageStr = pdfPageCount ? ` • ${pdfPageCount} pages` : "";
         md += `### 📄 PDF Document: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB${pageStr}*\n\n`;
-        md += `> Press **Ctrl + Enter** to open and read this PDF in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
+        md += `> Press **Ctrl + Enter** to open and print in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
       } else if (fileCategory === "archive") {
         md += `# ${displayTitle}\n\n`;
         md += `### 📦 Archive: ${firstAttachment.name}\n\n`;
