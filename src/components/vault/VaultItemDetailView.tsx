@@ -20,6 +20,15 @@ import { BrowserProfile } from "../../types";
 import { getDecryptedAttachmentPath, openAttachment } from "../../utils/vaultStorage";
 import { launchBrowserProfile } from "../../utils/launcher";
 import { getFileCategory, getSuggestedAppsForFile, browseExecutableOnWindows } from "../../utils/vaultAppHelper";
+import {
+  inspectZipArchive,
+  extractPdfPreview,
+  extractAudioMetadata,
+  formatCsvAsTable,
+  extractWindowsThumbnail,
+  ZipEntryInfo,
+  AudioMetaInfo,
+} from "../../utils/vaultPreviewHelper";
 import { SetCustomAppForm } from "./SetCustomAppForm";
 import { VaultItemForm } from "./VaultItemForm";
 
@@ -66,6 +75,14 @@ export function VaultItemDetailView({
   const [imageBase64Uri, setImageBase64Uri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isShowingDetails, setIsShowingDetails] = useState(false);
+  const [zipInfo, setZipInfo] = useState<{
+    totalFiles: number;
+    totalUncompressedSize: number;
+    entries: ZipEntryInfo[];
+  } | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{ textSnippet?: string; pageCount?: number } | null>(null);
+  const [audioMeta, setAudioMeta] = useState<AudioMetaInfo | null>(null);
+  const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
 
   const firstAttachment: VaultAttachment | undefined =
     item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
@@ -105,6 +122,37 @@ export function VaultItemDetailView({
               const txt = fs.readFileSync(p, "utf8");
               setFileContent(txt);
             }
+          } catch {
+            // ignore
+          }
+        } else if (fileCategory === "archive") {
+          try {
+            const buf = fs.readFileSync(p);
+            const z = inspectZipArchive(buf);
+            setZipInfo(z);
+          } catch {
+            // ignore
+          }
+        } else if (fileCategory === "pdf") {
+          try {
+            const buf = fs.readFileSync(p);
+            const preview = extractPdfPreview(buf);
+            setPdfPreview(preview);
+          } catch {
+            // ignore
+          }
+          extractWindowsThumbnail(p).then((thumb) => {
+            if (thumb) setThumbnailUri(thumb);
+          });
+        } else if (fileCategory === "video") {
+          extractWindowsThumbnail(p).then((thumb) => {
+            if (thumb) setThumbnailUri(thumb);
+          });
+        } else if (fileCategory === "audio") {
+          try {
+            const buf = fs.readFileSync(p);
+            const meta = extractAudioMetadata(buf);
+            setAudioMeta(meta);
           } catch {
             // ignore
           }
@@ -216,19 +264,81 @@ export function VaultItemDetailView({
         ) {
           md += `*${firstAttachment.name}*\n\n`;
         }
-        const ext = path.extname(firstAttachment.name).replace(".", "") || "txt";
-        md += "```" + ext + "\n" + (fileContent || "(Empty or binary content)") + "\n```\n\n";
+        const ext = path.extname(firstAttachment.name).toLowerCase();
+        if ((ext === ".csv" || ext === ".tsv") && fileContent) {
+          md += `### 📊 Tabular Data Preview\n\n`;
+          const table = formatCsvAsTable(fileContent, 20);
+          md += table ? table + "\n\n" : "";
+        } else {
+          const lang = ext.replace(".", "") || "txt";
+          md += "```" + lang + "\n" + (fileContent || "(Empty or binary content)") + "\n```\n\n";
+        }
       } else if (fileCategory === "pdf") {
         md += `# ${displayTitle}\n\n`;
+        if (thumbnailUri) {
+          md += `![PDF Page 1](${thumbnailUri})\n\n`;
+        }
         md += `### 📄 PDF Document: ${firstAttachment.name}\n\n`;
-        md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB*\n\n`;
+        const pageStr = pdfPreview?.pageCount ? ` • ${pdfPreview.pageCount} pages` : "";
+        md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB${pageStr}*\n\n`;
+
+        if (pdfPreview?.textSnippet) {
+          md += `#### 📑 Document Text Preview:\n`;
+          md += `> ${pdfPreview.textSnippet.replace(/\n+/g, "\n> ")}\n\n`;
+        }
+
         md += `> Press **Ctrl + Enter** to open and read this PDF in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
-      } else if (fileCategory === "video" || fileCategory === "audio") {
-        const icon = fileCategory === "video" ? "🎬" : "🎵";
+      } else if (fileCategory === "archive") {
         md += `# ${displayTitle}\n\n`;
-        md += `### ${icon} Media File: ${firstAttachment.name}\n\n`;
+        md += `### 📦 Archive: ${firstAttachment.name}\n\n`;
+        const uncompMB = zipInfo ? (zipInfo.totalUncompressedSize / (1024 * 1024)).toFixed(2) : undefined;
+        const sizeStr = uncompMB && Number(uncompMB) > 0 ? ` • ${uncompMB} MB uncompressed` : "";
+        md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB compressed${sizeStr}*\n\n`;
+
+        if (zipInfo && zipInfo.entries.length > 0) {
+          md += `#### 📂 Archived Files (${zipInfo.totalFiles}):\n\n`;
+          md += `| File Name | Size |\n| :--- | :---: |\n`;
+          const displayEntries = zipInfo.entries.slice(0, 30);
+          for (const e of displayEntries) {
+            if (e.isDirectory) {
+              md += `| 📁 \`${e.name}\` | *Folder* |\n`;
+            } else {
+              const sz =
+                e.size > 1024 * 1024 ? `${(e.size / (1024 * 1024)).toFixed(2)} MB` : `${(e.size / 1024).toFixed(1)} KB`;
+              md += `| 📄 \`${e.name}\` | ${sz} |\n`;
+            }
+          }
+          if (zipInfo.entries.length > 30) {
+            md += `\n*... and ${zipInfo.entries.length - 30} more files*\n\n`;
+          } else {
+            md += `\n`;
+          }
+        }
+
+        md += `> Press **Ctrl + Enter** to open or extract in your archive manager (7-Zip / WinRAR / Windows Explorer).\n\n`;
+      } else if (fileCategory === "video") {
+        md += `# ${displayTitle}\n\n`;
+        if (thumbnailUri) {
+          md += `![Video Poster Frame](${thumbnailUri})\n\n`;
+        }
+        md += `### 🎬 Video File: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB*\n\n`;
-        md += `> Press **Ctrl + Enter** to play in your media player (VLC / Media Player).\n\n`;
+        md += `> Press **Ctrl + Enter** to play in your media player (VLC / Windows Media Player).\n\n`;
+      } else if (fileCategory === "audio") {
+        md += `# ${displayTitle}\n\n`;
+        if (audioMeta?.coverImageUri) {
+          md += `![Album Artwork](${audioMeta.coverImageUri})\n\n`;
+        }
+        md += `### 🎵 Audio File: ${firstAttachment.name}\n\n`;
+        if (audioMeta?.title || audioMeta?.artist || audioMeta?.album) {
+          const track = audioMeta.title ? `**${audioMeta.title}**` : "";
+          const by = audioMeta.artist ? ` by **${audioMeta.artist}**` : "";
+          const alb = audioMeta.album ? ` • *${audioMeta.album}*` : "";
+          const yr = audioMeta.year ? ` (${audioMeta.year})` : "";
+          md += `> 🎶 ${track}${by}${alb}${yr}\n\n`;
+        }
+        md += `*Size: ${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB*\n\n`;
+        md += `> Press **Ctrl + Enter** to play in your media player (VLC / Windows Media Player).\n\n`;
       } else {
         md += `# ${displayTitle}\n\n`;
         md += `### 📦 Attached File: ${firstAttachment.name}\n\n`;
@@ -247,7 +357,18 @@ export function VaultItemDetailView({
     }
 
     return md;
-  }, [item, firstAttachment, fileCategory, imageBase64Uri, fileContent, displayTitle]);
+  }, [
+    item,
+    firstAttachment,
+    fileCategory,
+    imageBase64Uri,
+    fileContent,
+    displayTitle,
+    zipInfo,
+    pdfPreview,
+    audioMeta,
+    thumbnailUri,
+  ]);
 
   const navTitle = useMemo(() => {
     return displayTitle;
