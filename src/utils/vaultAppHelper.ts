@@ -1,5 +1,8 @@
 import path from "path";
 import { execFile } from "child_process";
+import { Icon, Color, Image } from "@raycast/api";
+import { VaultItem } from "../types/vault";
+import { getDecryptedAttachmentPath } from "./vaultStorage";
 
 export interface AppPreset {
   id: string;
@@ -102,6 +105,88 @@ export function getSuggestedAppsForFile(fileName: string): AppPreset[] {
         { id: "msedge.exe", title: "Microsoft Edge" },
       ];
   }
+}
+
+/**
+ * Formats a timestamp into a natural, friendly string matching modern Raycast grids
+ * (e.g. "Today, 2:26 PM", "Yesterday, 7:20 AM", or "Sep 10, 4:15 PM")
+ */
+export function formatRelativeDateTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const timeStr = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  }
+  if (isYesterday) {
+    return `Yesterday, ${timeStr}`;
+  }
+
+  const isSameYear = date.getFullYear() === now.getFullYear();
+  if (isSameYear) {
+    return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${timeStr}`;
+  }
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/**
+ * Returns the card thumbnail / icon for a vault item in the Grid.
+ * For images, decrypts to temp storage and returns the local file path.
+ * For other types, returns rich themed icons.
+ */
+export function getItemGridContent(item: VaultItem, vaultKey: Buffer): Image.ImageLike {
+  const firstAttachment = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+
+  if (firstAttachment) {
+    const cat = getFileCategory(firstAttachment.name);
+    if (cat === "image") {
+      try {
+        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
+        if (localPath) {
+          return { source: localPath };
+        }
+      } catch {
+        // fallback to icon
+      }
+      return { source: Icon.Image, tintColor: Color.Blue };
+    }
+    if (cat === "pdf") {
+      return { source: Icon.Document, tintColor: Color.Red };
+    }
+    if (cat === "video") {
+      return { source: Icon.Video, tintColor: Color.Purple };
+    }
+    if (cat === "audio") {
+      return { source: Icon.SpeakerOn, tintColor: Color.Magenta };
+    }
+    if (cat === "code") {
+      return { source: Icon.Code, tintColor: Color.Green };
+    }
+    if (cat === "document") {
+      return { source: Icon.Paragraph, tintColor: Color.Orange };
+    }
+    if (cat === "archive") {
+      return { source: Icon.Folder, tintColor: Color.Yellow };
+    }
+    return { source: Icon.Document, tintColor: Color.PrimaryText };
+  }
+
+  if (item.url) {
+    return { source: Icon.Globe, tintColor: Color.Blue };
+  }
+
+  return { source: Icon.Lock, tintColor: Color.SecondaryText };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import path from "path";
-import { List, ActionPanel, Action, Icon, Color, showToast, Toast, confirmAlert, Alert, Keyboard } from "@raycast/api";
+import { Grid, ActionPanel, Action, Icon, showToast, Toast, confirmAlert, Alert, Keyboard } from "@raycast/api";
 import { VaultItem, VaultAttachment } from "../../types/vault";
 import { BrowserProfile } from "../../types";
 import {
@@ -17,7 +17,13 @@ import { detectInstalledProfiles } from "../../utils/browserDetector";
 import { launchBrowserProfile } from "../../utils/launcher";
 import { VaultItemForm } from "./VaultItemForm";
 import { SetCustomAppForm } from "./SetCustomAppForm";
-import { getSuggestedAppsForFile, browseExecutableOnWindows } from "../../utils/vaultAppHelper";
+import { VaultItemDetailView } from "./VaultItemDetailView";
+import {
+  getSuggestedAppsForFile,
+  browseExecutableOnWindows,
+  formatRelativeDateTime,
+  getItemGridContent,
+} from "../../utils/vaultAppHelper";
 
 interface VaultMainViewProps {
   vaultKey: Buffer;
@@ -31,7 +37,6 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Clean temp decrypted files on unmount/lock
   useEffect(() => {
     return () => {
       cleanTempVaultFiles();
@@ -102,7 +107,7 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
       await saveVaultItems(newItems, vaultKey);
       await showToast({
         style: Toast.Style.Success,
-        title: "Vault Item Deleted",
+        title: "Item Deleted",
       });
     } catch (err) {
       await showToast({
@@ -113,6 +118,16 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
     }
   }
 
+  async function handleDeleteItemDirect(itemId: string) {
+    const newItems = items.filter((i) => i.id !== itemId);
+    setItems(newItems);
+    await saveVaultItems(newItems, vaultKey);
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Item Deleted",
+    });
+  }
+
   async function handleToggleFavorite(itemId: string) {
     const newItems = items.map((i) => (i.id === itemId ? { ...i, isFavorite: !i.isFavorite } : i));
     setItems(newItems);
@@ -121,17 +136,9 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
 
   async function handleLaunch(item: VaultItem, isPrivate = false) {
     if (!item.url) return;
-
-    let profile = profiles.find((p) => p.id === item.preferredProfileId);
-    if (!profile && profiles.length > 0) {
-      profile = profiles[0];
-    }
-
+    const profile = profiles.find((p) => p.id === item.preferredProfileId) || profiles[0];
     if (!profile) {
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "No browser profiles detected",
-      });
+      await showToast({ style: Toast.Style.Failure, title: "No browser profile found" });
       return;
     }
 
@@ -152,8 +159,13 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   }
 
   async function handleOpenAttachment(att: VaultAttachment, specificApp?: string) {
+    const isSystemDialog = specificApp === "__system_dialog__";
     const targetApp = specificApp !== undefined ? specificApp : att.customAppPath;
-    const appLabel = targetApp ? path.basename(targetApp) : "Windows default app";
+    const appLabel = isSystemDialog
+      ? "Windows 'Open With' dialog"
+      : targetApp
+        ? path.basename(targetApp)
+        : "Windows default app";
     await showToast({ style: Toast.Style.Animated, title: `Opening in ${appLabel}...` });
     const res = await openAttachment(att, vaultKey, specificApp);
     if (!res.success) {
@@ -184,210 +196,142 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   const favorites = useMemo(() => filteredItems.filter((i) => i.isFavorite), [filteredItems]);
   const nonFavorites = useMemo(() => filteredItems.filter((i) => !i.isFavorite), [filteredItems]);
 
-  function renderItemDetail(item: VaultItem) {
-    const profile = profiles.find((p) => p.id === item.preferredProfileId);
-    const profileName = profile ? profile.displayName : "Default System Browser";
-
-    let md = `# ${item.title}\n\n`;
-
-    if (item.url) {
-      md += `**🔗 Destination URL:** [${item.url}](${item.url})\n\n`;
-    }
-
-    if (item.notes) {
-      md += `### 📝 Secret Notes\n${item.notes}\n\n`;
-    }
-
-    if (item.attachments && item.attachments.length > 0) {
-      md += `### 📎 Attached Encrypted Files\n`;
-      for (const att of item.attachments) {
-        const openerInfo = att.customAppPath
-          ? " *(Opens in: " + att.customAppPath + ")*"
-          : " *(Opens in Windows default app)*";
-        md += `• **${att.name}** (${(att.size / 1024).toFixed(1)} KB)${openerInfo}\n`;
-      }
-      md += `\n*💡 Press **Enter** to decrypt and open in its configured viewer.*\n`;
-    }
-
-    md += `\n---\n*Added: ${new Date(item.createdAt).toLocaleDateString()}*\n`;
-
-    return (
-      <List.Item.Detail
-        markdown={md}
-        metadata={
-          <List.Item.Detail.Metadata>
-            <List.Item.Detail.Metadata.Label title="Title" text={item.title} />
-            <List.Item.Detail.Metadata.TagList title="Category">
-              <List.Item.Detail.Metadata.TagList.Item text={item.category} color={Color.Blue} />
-            </List.Item.Detail.Metadata.TagList>
-            <List.Item.Detail.Metadata.Label title="Preferred Profile" text={profileName} icon={Icon.Globe} />
-            {item.url ? (
-              <List.Item.Detail.Metadata.Link title="Destination Link" target={item.url} text={item.url} />
-            ) : null}
-            <List.Item.Detail.Metadata.Separator />
-            <List.Item.Detail.Metadata.Label
-              title="Attachments"
-              text={`${item.attachments?.length || 0} file(s)`}
-              icon={Icon.Paperclip}
-            />
-            <List.Item.Detail.Metadata.Label
-              title="Last Updated"
-              text={new Date(item.updatedAt).toLocaleDateString()}
-            />
-          </List.Item.Detail.Metadata>
-        }
-      />
-    );
-  }
-
-  function renderRow(item: VaultItem) {
+  function renderGridItem(item: VaultItem) {
     const hasAttachments = item.attachments && item.attachments.length > 0;
     const firstAttachment = hasAttachments ? item.attachments[0] : undefined;
 
     return (
-      <List.Item
+      <Grid.Item
         key={item.id}
         id={item.id}
         title={item.title}
-        subtitle={item.url || item.notes?.substring(0, 30)}
-        icon={item.isFavorite ? { source: Icon.Star, tintColor: Color.Yellow } : Icon.Lock}
-        accessories={[
-          ...(hasAttachments ? [{ icon: Icon.Paperclip, tooltip: `${item.attachments.length} attachment(s)` }] : []),
-          { tag: { value: item.category, color: Color.Blue } },
-        ]}
-        detail={renderItemDetail(item)}
+        subtitle={formatRelativeDateTime(item.createdAt)}
+        content={getItemGridContent(item, vaultKey)}
         actions={
           <ActionPanel>
+            {/* 1. PRIMARY ACTION: Opens inside Raycast on Enter and on Click! */}
+            <Action.Push
+              title="Open Inside Raycast"
+              icon={Icon.Eye}
+              target={
+                <VaultItemDetailView
+                  item={item}
+                  vaultKey={vaultKey}
+                  profiles={profiles}
+                  onItemUpdated={handleSaveItem}
+                  onItemDeleted={handleDeleteItemDirect}
+                />
+              }
+            />
+
+            {/* 2. EXTERNAL OPENER: Triggered by Ctrl + Enter directly from Grid! */}
             {hasAttachments && firstAttachment ? (
-              <ActionPanel.Section title="File Actions">
+              <Action
+                title={
+                  firstAttachment.customAppPath
+                    ? `Open in ${path.basename(firstAttachment.customAppPath)}`
+                    : `Open in Default App (${firstAttachment.name})`
+                }
+                icon={Icon.ArrowRight}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => handleOpenAttachment(firstAttachment)}
+              />
+            ) : item.url ? (
+              <Action
+                title="Launch Destination URL"
+                icon={Icon.Globe}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => handleLaunch(item, false)}
+              />
+            ) : null}
+
+            {/* 3. Open With Submenu: Triggered by Ctrl + Shift + O */}
+            {hasAttachments && firstAttachment ? (
+              <ActionPanel.Submenu
+                title="Open with…"
+                icon={Icon.AppWindow}
+                shortcut={Keyboard.Shortcut.Common.OpenWith}
+              >
                 <Action
-                  title={
-                    firstAttachment.customAppPath
-                      ? `Open in ${path.basename(firstAttachment.customAppPath)}`
-                      : `Open in Default App (${firstAttachment.name})`
-                  }
-                  icon={Icon.Document}
-                  onAction={() => handleOpenAttachment(firstAttachment)}
+                  title="Windows 'Open with' Dialog…"
+                  icon={Icon.Window}
+                  onAction={() => handleOpenAttachment(firstAttachment, "__system_dialog__")}
                 />
-                <ActionPanel.Submenu
-                  title="Open with…"
-                  icon={Icon.AppWindow}
-                  shortcut={Keyboard.Shortcut.Common.OpenWith}
-                >
-                  <Action
-                    title="Windows 'Open with' Dialog…"
-                    icon={Icon.Window}
-                    onAction={() => handleOpenAttachment(firstAttachment, "__system_dialog__")}
-                  />
-                  <ActionPanel.Section title={`Suggested Apps for ${firstAttachment.name}`}>
-                    {getSuggestedAppsForFile(firstAttachment.name).map((app) => (
-                      <Action
-                        key={app.id}
-                        title={`Open in ${app.title}`}
-                        icon={Icon.AppWindow}
-                        onAction={() => handleOpenAttachment(firstAttachment, app.id)}
-                      />
-                    ))}
-                  </ActionPanel.Section>
-                  <Action
-                    title="Browse Other App on PC…"
-                    icon={Icon.Finder}
-                    onAction={async () => {
-                      const picked = await browseExecutableOnWindows();
-                      if (picked) {
-                        await handleOpenAttachment(firstAttachment, picked);
-                      }
-                    }}
-                  />
-                </ActionPanel.Submenu>
-                <Action.Push
-                  title="Set Default App for File…"
-                  icon={Icon.Gear}
-                  shortcut={Keyboard.Shortcut.Common.Open}
-                  target={
-                    <SetCustomAppForm
-                      item={item}
-                      attachment={firstAttachment}
-                      mode="set_default"
-                      onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
+                <ActionPanel.Section title={`Suggested Apps for ${firstAttachment.name}`}>
+                  {getSuggestedAppsForFile(firstAttachment.name).map((app) => (
+                    <Action
+                      key={app.id}
+                      title={`Open in ${app.title}`}
+                      icon={Icon.AppWindow}
+                      onAction={() => handleOpenAttachment(firstAttachment, app.id)}
                     />
-                  }
+                  ))}
+                </ActionPanel.Section>
+                <Action
+                  title="Browse Other App on PC…"
+                  icon={Icon.Finder}
+                  onAction={async () => {
+                    const picked = await browseExecutableOnWindows();
+                    if (picked) {
+                      await handleOpenAttachment(firstAttachment, picked);
+                    }
+                  }}
                 />
-              </ActionPanel.Section>
+              </ActionPanel.Submenu>
             ) : null}
 
-            {item.url ? (
-              <ActionPanel.Section title="Launch Destination">
-                <Action
-                  title="Launch in Preferred Profile"
-                  icon={Icon.Globe}
-                  onAction={() => handleLaunch(item, false)}
-                />
-                <Action
-                  title="Launch in Incognito / InPrivate"
-                  icon={Icon.EyeSlash}
-                  shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                  onAction={() => handleLaunch(item, true)}
-                />
-              </ActionPanel.Section>
-            ) : null}
-
-            <ActionPanel.Section title="Manage Item">
+            {/* 4. Set Default App: Triggered by Ctrl + O */}
+            {hasAttachments && firstAttachment ? (
               <Action.Push
-                title="Add New Secret Item…"
+                title="Set Default App for File…"
+                icon={Icon.Gear}
+                shortcut={Keyboard.Shortcut.Common.Open}
+                target={
+                  <SetCustomAppForm
+                    item={item}
+                    attachment={firstAttachment}
+                    mode="set_default"
+                    onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
+                  />
+                }
+              />
+            ) : null}
+
+            <ActionPanel.Section title="Management">
+              <Action.Push
+                title="Add New Vault Item"
                 icon={Icon.Plus}
                 shortcut={Keyboard.Shortcut.Common.New}
-                target={<VaultItemForm vaultKey={vaultKey} categories={categories} onSave={handleSaveItem} />}
+                target={<VaultItemForm categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />}
               />
               <Action.Push
-                title="Edit Item…"
+                title="Edit Item"
                 icon={Icon.Pencil}
                 shortcut={Keyboard.Shortcut.Common.Edit}
                 target={
                   <VaultItemForm
                     initialItem={item}
-                    vaultKey={vaultKey}
                     categories={categories}
+                    vaultKey={vaultKey}
                     onSave={handleSaveItem}
                   />
                 }
               />
               <Action
-                title="Delete Item"
-                icon={Icon.Trash}
-                style={Action.Style.Destructive}
-                // eslint-disable-next-line @raycast/prefer-common-shortcut
-                shortcut={{ modifiers: ["ctrl"], key: "d" }}
-                onAction={() => handleDeleteItem(item)}
-              />
-              <Action
-                title={item.isFavorite ? "Remove from Favorites" : "Mark as Favorite"}
+                title={item.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                 icon={Icon.Star}
                 shortcut={{ modifiers: ["ctrl"], key: "f" }}
                 onAction={() => handleToggleFavorite(item.id)}
               />
-            </ActionPanel.Section>
-
-            <ActionPanel.Section title="Clipboard">
-              {item.url ? (
-                <Action.CopyToClipboard
-                  title="Copy Destination URL"
-                  content={item.url}
-                  shortcut={{ modifiers: ["ctrl"], key: "c" }}
-                />
-              ) : null}
-              {item.notes ? (
-                <Action.CopyToClipboard
-                  title="Copy Secret Notes"
-                  content={item.notes}
-                  shortcut={Keyboard.Shortcut.Common.Copy}
-                />
-              ) : null}
-            </ActionPanel.Section>
-
-            <ActionPanel.Section title="Security">
               <Action
-                title="Lock Vault Immediately"
+                title="Delete Vault Item"
+                icon={Icon.Trash}
+                style={Action.Style.Destructive}
+                shortcut={Keyboard.Shortcut.Common.Remove}
+                onAction={() => handleDeleteItem(item)}
+              />
+              <Action
+                title="Lock Vault Now"
                 icon={Icon.Lock}
                 shortcut={{ modifiers: ["ctrl"], key: "l" }}
                 onAction={onLock}
@@ -400,45 +344,42 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   }
 
   return (
-    <List
+    <Grid
+      columns={4}
+      aspectRatio="16/9"
+      fit={Grid.Fit.Fill}
       isLoading={isLoading}
-      isShowingDetail={items.length > 0}
-      searchBarPlaceholder="Search secret titles, URLs, notes, categories..."
+      searchBarPlaceholder="Filter vault items by name or notes..."
       searchBarAccessory={
-        <List.Dropdown tooltip="Filter Category" value={selectedCategory} onChange={setSelectedCategory}>
-          <List.Dropdown.Item value="all" title="All Categories" icon={Icon.List} />
-          {categories.map((cat) => (
-            <List.Dropdown.Item key={cat} value={cat} title={cat} icon={Icon.Tag} />
-          ))}
-        </List.Dropdown>
-      }
-      actions={
-        <ActionPanel>
-          <Action.Push
-            title="Add New Secret Item…"
-            icon={Icon.Plus}
-            shortcut={Keyboard.Shortcut.Common.New}
-            target={<VaultItemForm vaultKey={vaultKey} categories={categories} onSave={handleSaveItem} />}
-          />
-          <Action title="Lock Vault" icon={Icon.Lock} shortcut={{ modifiers: ["ctrl"], key: "l" }} onAction={onLock} />
-        </ActionPanel>
+        <Grid.Dropdown
+          tooltip="Filter by Category"
+          value={selectedCategory}
+          onChange={(newCategory) => setSelectedCategory(newCategory)}
+        >
+          <Grid.Dropdown.Item title="All Items" value="all" />
+          <Grid.Dropdown.Section title="Categories">
+            {categories.map((cat) => (
+              <Grid.Dropdown.Item key={cat} title={cat.toUpperCase()} value={cat} />
+            ))}
+          </Grid.Dropdown.Section>
+        </Grid.Dropdown>
       }
     >
-      {items.length === 0 ? (
-        <List.EmptyView
-          title="Your Vault is Empty"
-          description="Press Ctrl + N to securely store your first private link, note, screenshot, or PDF document."
+      {filteredItems.length === 0 ? (
+        <Grid.EmptyView
           icon={Icon.Lock}
+          title="No Vault Items"
+          description="Press Ctrl+N to add an encrypted file, credential, or bookmark."
           actions={
             <ActionPanel>
               <Action.Push
-                title="Add New Secret Item…"
+                title="Add New Vault Item"
                 icon={Icon.Plus}
                 shortcut={Keyboard.Shortcut.Common.New}
-                target={<VaultItemForm vaultKey={vaultKey} categories={categories} onSave={handleSaveItem} />}
+                target={<VaultItemForm categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />}
               />
               <Action
-                title="Lock Vault"
+                title="Lock Vault Now"
                 icon={Icon.Lock}
                 shortcut={{ modifiers: ["ctrl"], key: "l" }}
                 onAction={onLock}
@@ -448,17 +389,12 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
         />
       ) : (
         <>
-          {favorites.length > 0 ? (
-            <List.Section title="Favorites" subtitle={`${favorites.length} pinned`}>
-              {favorites.map(renderRow)}
-            </List.Section>
-          ) : null}
-
-          <List.Section title="Secret Items" subtitle={`${nonFavorites.length} item(s)`}>
-            {nonFavorites.map(renderRow)}
-          </List.Section>
+          {favorites.length > 0 ? <Grid.Section title="Favorites">{favorites.map(renderGridItem)}</Grid.Section> : null}
+          <Grid.Section title={favorites.length > 0 ? "All Items" : undefined}>
+            {nonFavorites.map(renderGridItem)}
+          </Grid.Section>
         </>
       )}
-    </List>
+    </Grid>
   );
 }

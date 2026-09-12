@@ -132,6 +132,12 @@ export async function saveAttachment(sourceFilePath: string, key: Buffer): Promi
 }
 
 export function getDecryptedAttachmentPath(attachment: VaultAttachment, key: Buffer): string | null {
+  const tempDir = getTempDecryptedDir();
+  const tempFile = path.join(tempDir, `${attachment.id}_${attachment.name}`);
+  if (fs.existsSync(tempFile)) {
+    return tempFile;
+  }
+
   const encryptedPath = path.join(getVaultFilesDir(), attachment.encryptedFileName);
   if (!fs.existsSync(encryptedPath)) return null;
 
@@ -139,9 +145,6 @@ export function getDecryptedAttachmentPath(attachment: VaultAttachment, key: Buf
     const raw = fs.readFileSync(encryptedPath, "utf8");
     const payload = JSON.parse(raw) as EncryptedPayload;
     const decryptedBuffer = decryptBuffer(payload, key);
-
-    const tempDir = getTempDecryptedDir();
-    const tempFile = path.join(tempDir, `${attachment.id}_${attachment.name}`);
     fs.writeFileSync(tempFile, decryptedBuffer);
     return tempFile;
   } catch {
