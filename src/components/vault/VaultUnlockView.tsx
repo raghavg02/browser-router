@@ -165,7 +165,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
   if (isSetup === false) {
     return (
       <Form
-        navigationTitle="🔒 Set Up Encrypted Vault"
+        navigationTitle="Vault — Setup Your Private Space"
         actions={
           <ActionPanel>
             <Action.SubmitForm title="Create Vault & Encrypt" icon={Icon.Lock} onSubmit={handleSetup} />
@@ -174,12 +174,12 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
       >
         <Form.Description
           title="🔒 Vault Setup"
-          text="Choose a master password or PIN to protect your private browser profiles, tabs, files, and notes with AES-256 encryption."
+          text="Choose a master password to protect your private browser profiles, tabs, files, and notes."
         />
         <Form.PasswordField
           id="password"
-          title="Master Password / PIN"
-          placeholder="Enter a PIN or password of your choice"
+          title="Master Password"
+          placeholder="Enter a password or PIN of your choice"
           value={password}
           error={passwordError}
           onChange={(val) => {
@@ -242,7 +242,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
 
   return (
     <Form
-      navigationTitle="🔒 Encrypted Browser Vault"
+      navigationTitle="Vault — Your private space"
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Unlock Vault" icon={Icon.LockUnlocked} onSubmit={handleManualUnlock} />
@@ -261,13 +261,13 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         </ActionPanel>
       }
     >
-      <Form.Description title="🔒 Status" text="Vault is locked with AES-256-GCM encryption" />
+      <Form.Description title="🔒 Vault is Locked" text="Enter your password to continue" />
 
       <Form.PasswordField
         id="password"
-        title="Master Password"
-        placeholder="Enter password or PIN to decrypt..."
-        info="The vault decrypts and unlocks automatically as you type."
+        title="Password"
+        placeholder="Enter password..."
+        info="Your vault decrypts and unlocks automatically as you type."
         value={password}
         error={passwordError}
         onChange={handlePasswordChange}
@@ -276,9 +276,9 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
       <Form.Separator />
 
       <Form.Description
-        title="💡 Shortcuts & Help"
+        title="🛡️ Privacy"
         text={
-          "• Auto-Unlock: Decrypts immediately upon typing your password\n• Password Hint: Press Ctrl + H for your private hint dialog\n• Account Recovery: Press Ctrl + Shift + R to recover via your security question"
+          "Your data stays on this device.\n\n• Press Ctrl + H to view your password hint\n• Press Ctrl + Shift + R to recover via your security question"
         }
       />
     </Form>
