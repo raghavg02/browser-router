@@ -199,13 +199,23 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
   function renderGridItem(item: VaultItem) {
     const hasAttachments = item.attachments && item.attachments.length > 0;
     const firstAttachment = hasAttachments ? item.attachments[0] : undefined;
+    const displayTitle = item.title?.trim() || firstAttachment?.name || "Untitled Item";
+
+    // Index both the title and all attachment file names so users can find items by either title or filename
+    const keywords = [
+      ...(item.title?.trim() ? [item.title.trim()] : []),
+      ...item.attachments.map((a) => a.name),
+      ...(item.url ? [item.url] : []),
+      item.category,
+    ];
 
     return (
       <Grid.Item
         key={item.id}
         id={item.id}
-        title={item.title?.trim() || firstAttachment?.name || "Untitled Item"}
+        title={displayTitle}
         subtitle={formatRelativeDateTime(item.createdAt)}
+        keywords={keywords}
         content={getItemGridContent(item, vaultKey)}
         actions={
           <ActionPanel>

@@ -199,43 +199,44 @@ export function VaultItemDetailView({
   const markdown = useMemo(() => {
     let md = "";
 
-    // Always render title prominently at the top of the detail view
-    md += `# ${displayTitle}\n\n`;
-
     if (firstAttachment) {
-      // If user specified custom title differing from filename, display filename as subtitle
-      if (
-        item.title?.trim() &&
-        firstAttachment.name &&
-        item.title.trim().toLowerCase() !== firstAttachment.name.toLowerCase()
-      ) {
-        md += `*${firstAttachment.name}*\n\n`;
-      }
-
       if (fileCategory === "image") {
+        // Image displays full-window edge-to-edge without markdown header text pushing it down
         if (imageBase64Uri) {
           md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${imageBase64Uri})\n\n`;
         } else {
           md += "*Loading image preview...*\n\n";
         }
       } else if (fileCategory === "code" || fileCategory === "document") {
+        md += `# ${displayTitle}\n\n`;
+        if (
+          item.title?.trim() &&
+          firstAttachment.name &&
+          item.title.trim().toLowerCase() !== firstAttachment.name.toLowerCase()
+        ) {
+          md += `*${firstAttachment.name}*\n\n`;
+        }
         const ext = path.extname(firstAttachment.name).replace(".", "") || "txt";
         md += "```" + ext + "\n" + (fileContent || "(Empty or binary content)") + "\n```\n\n";
       } else if (fileCategory === "pdf") {
+        md += `# ${displayTitle}\n\n`;
         md += `### 📄 PDF Document: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB*\n\n`;
         md += `> Press **Ctrl + Enter** to open and read this PDF in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
       } else if (fileCategory === "video" || fileCategory === "audio") {
         const icon = fileCategory === "video" ? "🎬" : "🎵";
+        md += `# ${displayTitle}\n\n`;
         md += `### ${icon} Media File: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB*\n\n`;
         md += `> Press **Ctrl + Enter** to play in your media player (VLC / Media Player).\n\n`;
       } else {
+        md += `# ${displayTitle}\n\n`;
         md += `### 📦 Attached File: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB*\n\n`;
         md += `> Press **Ctrl + Enter** to open in its external application.\n\n`;
       }
     } else {
+      md += `# ${displayTitle}\n\n`;
       if (item.url) {
         md += `**Destination URL:** [${item.url}](${item.url})\n\n`;
       }
