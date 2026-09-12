@@ -204,7 +204,7 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
       <Grid.Item
         key={item.id}
         id={item.id}
-        title={item.title}
+        title={item.title?.trim() || firstAttachment?.name || "Untitled Item"}
         subtitle={formatRelativeDateTime(item.createdAt)}
         content={getItemGridContent(item, vaultKey)}
         actions={

@@ -192,10 +192,26 @@ export function VaultItemDetailView({
     }
   }
 
+  const displayTitle = useMemo(() => {
+    return item.title?.trim() || firstAttachment?.name || "Vault Item";
+  }, [item.title, firstAttachment]);
+
   const markdown = useMemo(() => {
     let md = "";
 
+    // Always render title prominently at the top of the detail view
+    md += `# ${displayTitle}\n\n`;
+
     if (firstAttachment) {
+      // If user specified custom title differing from filename, display filename as subtitle
+      if (
+        item.title?.trim() &&
+        firstAttachment.name &&
+        item.title.trim().toLowerCase() !== firstAttachment.name.toLowerCase()
+      ) {
+        md += `*${firstAttachment.name}*\n\n`;
+      }
+
       if (fileCategory === "image") {
         if (imageBase64Uri) {
           md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${imageBase64Uri})\n\n`;
@@ -204,27 +220,22 @@ export function VaultItemDetailView({
         }
       } else if (fileCategory === "code" || fileCategory === "document") {
         const ext = path.extname(firstAttachment.name).replace(".", "") || "txt";
-        md += `# ${item.title}\n\n`;
         md += "```" + ext + "\n" + (fileContent || "(Empty or binary content)") + "\n```\n\n";
       } else if (fileCategory === "pdf") {
-        md += `# ${item.title}\n\n`;
         md += `### 📄 PDF Document: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB*\n\n`;
         md += `> Press **Ctrl + Enter** to open and read this PDF in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
       } else if (fileCategory === "video" || fileCategory === "audio") {
         const icon = fileCategory === "video" ? "🎬" : "🎵";
-        md += `# ${item.title}\n\n`;
         md += `### ${icon} Media File: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / (1024 * 1024)).toFixed(2)} MB*\n\n`;
         md += `> Press **Ctrl + Enter** to play in your media player (VLC / Media Player).\n\n`;
       } else {
-        md += `# ${item.title}\n\n`;
         md += `### 📦 Attached File: ${firstAttachment.name}\n\n`;
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB*\n\n`;
         md += `> Press **Ctrl + Enter** to open in its external application.\n\n`;
       }
     } else {
-      md += `# ${item.title}\n\n`;
       if (item.url) {
         md += `**Destination URL:** [${item.url}](${item.url})\n\n`;
       }
@@ -235,11 +246,11 @@ export function VaultItemDetailView({
     }
 
     return md;
-  }, [item, firstAttachment, fileCategory, imageBase64Uri, fileContent]);
+  }, [item, firstAttachment, fileCategory, imageBase64Uri, fileContent, displayTitle]);
 
   const navTitle = useMemo(() => {
-    return item.title || firstAttachment?.name || "Vault Item";
-  }, [item.title, firstAttachment]);
+    return displayTitle;
+  }, [displayTitle]);
 
   return (
     <Detail
