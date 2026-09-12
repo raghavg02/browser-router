@@ -31,6 +31,28 @@ interface VaultItemDetailViewProps {
   onItemDeleted: (itemId: string) => Promise<void>;
 }
 
+function getImageMimeType(fileName: string): string {
+  const ext = path.extname(fileName).toLowerCase();
+  switch (ext) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".svg":
+      return "image/svg+xml";
+    case ".bmp":
+      return "image/bmp";
+    case ".ico":
+      return "image/x-icon";
+    case ".png":
+    default:
+      return "image/png";
+  }
+}
+
 export function VaultItemDetailView({
   item,
   vaultKey,
@@ -41,6 +63,7 @@ export function VaultItemDetailView({
   const { pop } = useNavigation();
   const [decryptedPath, setDecryptedPath] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [imageBase64Uri, setImageBase64Uri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isShowingDetails, setIsShowingDetails] = useState(false);
 
@@ -65,17 +88,26 @@ export function VaultItemDetailView({
       const p = getDecryptedAttachmentPath(firstAttachment, vaultKey);
       setDecryptedPath(p);
 
-      // If text/code, read content for preview
-      if (p && (fileCategory === "code" || fileCategory === "document")) {
-        try {
-          const stat = fs.statSync(p);
-          if (stat.size < 500 * 1024) {
-            // Read up to 500KB
-            const txt = fs.readFileSync(p, "utf8");
-            setFileContent(txt);
+      if (p) {
+        if (fileCategory === "image") {
+          // Read and convert to base64 Data URI so Raycast renders it natively without Chromium local resource blocks
+          try {
+            const buf = fs.readFileSync(p);
+            const mime = getImageMimeType(firstAttachment.name);
+            setImageBase64Uri(`data:${mime};base64,${buf.toString("base64")}`);
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
+        } else if (fileCategory === "code" || fileCategory === "document") {
+          try {
+            const stat = fs.statSync(p);
+            if (stat.size < 500 * 1024) {
+              const txt = fs.readFileSync(p, "utf8");
+              setFileContent(txt);
+            }
+          } catch {
+            // ignore
+          }
         }
       }
     } catch (err) {
@@ -164,11 +196,12 @@ export function VaultItemDetailView({
     let md = "";
 
     if (firstAttachment) {
-      if (fileCategory === "image" && decryptedPath) {
-        // Format path with forward slashes and URL-encode special chars/spaces/parentheses
-        const forwardPath = decryptedPath.replace(/\\/g, "/");
-        const encodedUrl = encodeURI(forwardPath).replace(/\(/g, "%28").replace(/\)/g, "%29");
-        md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${encodedUrl})\n\n`;
+      if (fileCategory === "image") {
+        if (imageBase64Uri) {
+          md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${imageBase64Uri})\n\n`;
+        } else {
+          md += "*Loading image preview...*\n\n";
+        }
       } else if (fileCategory === "code" || fileCategory === "document") {
         const ext = path.extname(firstAttachment.name).replace(".", "") || "txt";
         md += `# ${item.title}\n\n`;
@@ -202,10 +235,15 @@ export function VaultItemDetailView({
     }
 
     return md;
-  }, [item, firstAttachment, fileCategory, decryptedPath, fileContent]);
+  }, [item, firstAttachment, fileCategory, imageBase64Uri, fileContent]);
+
+  const navTitle = useMemo(() => {
+    return item.title || firstAttachment?.name || "Vault Item";
+  }, [item.title, firstAttachment]);
 
   return (
     <Detail
+      navigationTitle={navTitle}
       isLoading={isLoading}
       markdown={markdown}
       metadata={
