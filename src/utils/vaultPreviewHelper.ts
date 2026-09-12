@@ -325,3 +325,40 @@ try {
     );
   });
 }
+
+/**
+ * Renders Page 1 of any PDF document into a crystal-clear high-res PNG Base64 Data URI.
+ */
+export async function renderPdfPageToImage(pdfPath: string): Promise<{ imageUri?: string; pageCount?: number }> {
+  return new Promise((resolve) => {
+    const py = `import sys, base64
+try:
+    import pymupdf
+    doc = pymupdf.open(sys.argv[1])
+    if len(doc) > 0:
+        pix = doc[0].get_pixmap(dpi=150)
+        b64 = base64.b64encode(pix.tobytes("png")).decode("ascii")
+        print("RESULT:" + str(len(doc)) + ";data:image/png;base64," + b64)
+except Exception as e:
+    sys.stderr.write(str(e))
+`;
+    execFile(
+      "python",
+      ["-c", py, pdfPath],
+      { timeout: 7000, windowsHide: true, maxBuffer: 20 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err || !stdout) return resolve({});
+        const out = stdout.trim();
+        if (out.startsWith("RESULT:")) {
+          const semicolonIdx = out.indexOf(";");
+          if (semicolonIdx > 7) {
+            const pageCount = parseInt(out.slice(7, semicolonIdx), 10);
+            const imageUri = out.slice(semicolonIdx + 1);
+            return resolve({ imageUri, pageCount: isNaN(pageCount) ? undefined : pageCount });
+          }
+        }
+        resolve({});
+      },
+    );
+  });
+}

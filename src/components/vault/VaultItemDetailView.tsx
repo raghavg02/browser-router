@@ -22,7 +22,7 @@ import { launchBrowserProfile } from "../../utils/launcher";
 import { getFileCategory, getSuggestedAppsForFile, browseExecutableOnWindows } from "../../utils/vaultAppHelper";
 import {
   inspectZipArchive,
-  extractPdfPreview,
+  renderPdfPageToImage,
   extractAudioMetadata,
   formatCsvAsTable,
   extractWindowsThumbnail,
@@ -80,7 +80,8 @@ export function VaultItemDetailView({
     totalUncompressedSize: number;
     entries: ZipEntryInfo[];
   } | null>(null);
-  const [pdfPreview, setPdfPreview] = useState<{ textSnippet?: string; pageCount?: number } | null>(null);
+  const [pdfImageUri, setPdfImageUri] = useState<string | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState<number | undefined>(undefined);
   const [audioMeta, setAudioMeta] = useState<AudioMetaInfo | null>(null);
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
 
@@ -134,15 +135,10 @@ export function VaultItemDetailView({
             // ignore
           }
         } else if (fileCategory === "pdf") {
-          try {
-            const buf = fs.readFileSync(p);
-            const preview = extractPdfPreview(buf);
-            setPdfPreview(preview);
-          } catch {
-            // ignore
-          }
-          extractWindowsThumbnail(p).then((thumb) => {
-            if (thumb) setThumbnailUri(thumb);
+          // Render visual page-1 image preview of the PDF
+          renderPdfPageToImage(p).then((res) => {
+            if (res.imageUri) setPdfImageUri(res.imageUri);
+            if (res.pageCount) setPdfPageCount(res.pageCount);
           });
         } else if (fileCategory === "video") {
           extractWindowsThumbnail(p).then((thumb) => {
@@ -275,18 +271,14 @@ export function VaultItemDetailView({
         }
       } else if (fileCategory === "pdf") {
         md += `# ${displayTitle}\n\n`;
-        if (thumbnailUri) {
-          md += `![PDF Page 1](${thumbnailUri})\n\n`;
+        if (pdfImageUri) {
+          md += `![${firstAttachment.name.replace(/\[|\]/g, "")}](${pdfImageUri})\n\n`;
+        } else {
+          md += "*Loading visual PDF document preview...*\n\n";
         }
+        const pageStr = pdfPageCount ? ` • ${pdfPageCount} pages` : "";
         md += `### 📄 PDF Document: ${firstAttachment.name}\n\n`;
-        const pageStr = pdfPreview?.pageCount ? ` • ${pdfPreview.pageCount} pages` : "";
         md += `*Size: ${(firstAttachment.size / 1024).toFixed(1)} KB${pageStr}*\n\n`;
-
-        if (pdfPreview?.textSnippet) {
-          md += `#### 📑 Document Text Preview:\n`;
-          md += `> ${pdfPreview.textSnippet.replace(/\n+/g, "\n> ")}\n\n`;
-        }
-
         md += `> Press **Ctrl + Enter** to open and read this PDF in your default PDF viewer (Edge / Chrome / Acrobat).\n\n`;
       } else if (fileCategory === "archive") {
         md += `# ${displayTitle}\n\n`;
@@ -365,7 +357,8 @@ export function VaultItemDetailView({
     fileContent,
     displayTitle,
     zipInfo,
-    pdfPreview,
+    pdfImageUri,
+    pdfPageCount,
     audioMeta,
     thumbnailUri,
   ]);
