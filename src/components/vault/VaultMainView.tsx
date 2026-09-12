@@ -11,13 +11,13 @@ import {
   DEFAULT_CATEGORIES,
   cleanTempVaultFiles,
   openAttachment,
-  getDecryptedAttachmentPath,
   updateAttachmentCustomApp,
 } from "../../utils/vaultStorage";
 import { detectInstalledProfiles } from "../../utils/browserDetector";
 import { launchBrowserProfile } from "../../utils/launcher";
 import { VaultItemForm } from "./VaultItemForm";
 import { SetCustomAppForm } from "./SetCustomAppForm";
+import { getSuggestedAppsForFile, browseExecutableOnWindows } from "../../utils/vaultAppHelper";
 
 interface VaultMainViewProps {
   vaultKey: Buffer;
@@ -259,35 +259,49 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
         actions={
           <ActionPanel>
             {hasAttachments && firstAttachment ? (
-              <ActionPanel.Section title="File Opener">
+              <ActionPanel.Section title="File Actions">
                 <Action
                   title={
                     firstAttachment.customAppPath
                       ? `Open in ${path.basename(firstAttachment.customAppPath)}`
-                      : `Open "${firstAttachment.name}" in Default App`
+                      : `Open in Default App (${firstAttachment.name})`
                   }
                   icon={Icon.Document}
                   onAction={() => handleOpenAttachment(firstAttachment)}
                 />
-                <Action.Push
-                  title="Open in App Once…"
-                  icon={Icon.ArrowRight}
+                <ActionPanel.Submenu
+                  title="Open with…"
+                  icon={Icon.AppWindow}
                   shortcut={Keyboard.Shortcut.Common.OpenWith}
-                  target={
-                    <SetCustomAppForm
-                      item={item}
-                      attachment={firstAttachment}
-                      mode="open_once"
-                      onOpenOnce={(app) => handleOpenAttachment(firstAttachment, app)}
-                    />
-                  }
-                />
-                <Action.OpenWith
-                  title="Open with (System Dialog)…"
-                  path={getDecryptedAttachmentPath(firstAttachment, vaultKey) || ""}
-                />
+                >
+                  <Action
+                    title="Windows 'Open with' Dialog…"
+                    icon={Icon.Window}
+                    onAction={() => handleOpenAttachment(firstAttachment, "__system_dialog__")}
+                  />
+                  <ActionPanel.Section title={`Suggested Apps for ${firstAttachment.name}`}>
+                    {getSuggestedAppsForFile(firstAttachment.name).map((app) => (
+                      <Action
+                        key={app.id}
+                        title={`Open in ${app.title}`}
+                        icon={Icon.AppWindow}
+                        onAction={() => handleOpenAttachment(firstAttachment, app.id)}
+                      />
+                    ))}
+                  </ActionPanel.Section>
+                  <Action
+                    title="Browse Other App on PC…"
+                    icon={Icon.Finder}
+                    onAction={async () => {
+                      const picked = await browseExecutableOnWindows();
+                      if (picked) {
+                        await handleOpenAttachment(firstAttachment, picked);
+                      }
+                    }}
+                  />
+                </ActionPanel.Submenu>
                 <Action.Push
-                  title="Set Custom App for File…"
+                  title="Set Default App for File…"
                   icon={Icon.Gear}
                   shortcut={Keyboard.Shortcut.Common.Open}
                   target={

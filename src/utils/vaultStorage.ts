@@ -276,6 +276,20 @@ export async function openAttachment(
 
   const app = (specificApp || attachment.customAppPath || "").trim();
   try {
+    if (app === "__system_dialog__") {
+      // Launch native Windows "Open with..." dialog
+      if (process.platform === "win32") {
+        const child = spawn("rundll32.exe", ["shell32.dll,OpenAs_RunDLL", filePath], {
+          detached: true,
+          stdio: "ignore",
+        });
+        child.unref();
+      } else {
+        await open(filePath);
+      }
+      return { success: true, path: filePath };
+    }
+
     if (app) {
       // Launch using specific user-configured executable
       const child = spawn("cmd.exe", ["/c", "start", '""', `"${app}"`, `"${filePath}"`], {
