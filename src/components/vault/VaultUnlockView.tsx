@@ -261,11 +261,10 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         </ActionPanel>
       }
     >
-      <Form.Description title="🔒 Vault is Locked" text="Enter your password to continue" />
+      <Form.Description text={"\n\n🔒  Vault is locked\nEnter your password to continue\n"} />
 
       <Form.PasswordField
         id="password"
-        title="Password"
         placeholder="Enter password..."
         info="Your vault decrypts and unlocks automatically as you type."
         value={password}
@@ -273,12 +272,9 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
         onChange={handlePasswordChange}
       />
 
-      <Form.Separator />
-
       <Form.Description
-        title="🛡️ Privacy"
         text={
-          "Your data stays on this device.\n\n• Press Ctrl + H to view your password hint\n• Press Ctrl + Shift + R to recover via your security question"
+          "\n🛡️  Your data stays on this device.\n\n• Press Ctrl + H for password hint  |  Ctrl + Shift + R to reset"
         }
       />
     </Form>
