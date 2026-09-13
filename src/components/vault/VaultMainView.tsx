@@ -1,6 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import path from "path";
-import { Grid, ActionPanel, Action, Icon, showToast, Toast, confirmAlert, Alert, Keyboard } from "@raycast/api";
+import fs from "fs";
+import {
+  Grid,
+  List,
+  ActionPanel,
+  Action,
+  Icon,
+  showToast,
+  Toast,
+  confirmAlert,
+  Alert,
+  Keyboard,
+  getPreferenceValues,
+  Color,
+} from "@raycast/api";
 import { VaultItem, VaultAttachment } from "../../types/vault";
 import { BrowserProfile } from "../../types";
 import {
@@ -12,6 +26,7 @@ import {
   cleanTempVaultFiles,
   openAttachment,
   updateAttachmentCustomApp,
+  getDecryptedAttachmentPath,
 } from "../../utils/vaultStorage";
 import { detectInstalledProfiles } from "../../utils/browserDetector";
 import { launchBrowserProfile } from "../../utils/launcher";
@@ -24,7 +39,35 @@ import {
   browseExecutableOnWindows,
   formatRelativeDateTime,
   getItemGridContent,
+  getFileCategory,
 } from "../../utils/vaultAppHelper";
+
+interface Preferences {
+  vaultLayout?: "grid" | "split" | "list";
+  vaultGridColumns?: string;
+}
+
+export const FILE_TYPES = [
+  { id: "all", title: "All Types", icon: Icon.Filter },
+  { id: "video", title: "Videos", icon: Icon.Video },
+  { id: "image", title: "Images", icon: Icon.Image },
+  { id: "pdf", title: "PDF Documents", icon: Icon.Document },
+  { id: "audio", title: "Audio Tracks", icon: Icon.SpeakerOn },
+  { id: "spreadsheet", title: "Spreadsheets (CSV)", icon: Icon.BarChart },
+  { id: "code", title: "Source Code", icon: Icon.Code },
+  { id: "document", title: "Text & Docs", icon: Icon.Paragraph },
+  { id: "archive", title: "ZIP Archives", icon: Icon.Folder },
+  { id: "url", title: "Bookmarks & Links", icon: Icon.Globe },
+  { id: "note", title: "Secret Notes", icon: Icon.Text },
+];
+
+function getItemType(item: VaultItem): string {
+  if (item.attachments && item.attachments.length > 0) {
+    return getFileCategory(item.attachments[0].name);
+  }
+  if (item.url) return "url";
+  return "note";
+}
 
 interface VaultMainViewProps {
   vaultKey: Buffer;
@@ -32,9 +75,15 @@ interface VaultMainViewProps {
 }
 
 export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
+  const prefs = getPreferenceValues<Preferences>();
+  const [activeLayout, setActiveLayout] = useState<"grid" | "split" | "list">(prefs.vaultLayout || "grid");
+  const [activeColumns, setActiveColumns] = useState<number>(parseInt(prefs.vaultGridColumns || "4", 10) || 4);
+
   const [items, setItems] = useState<VaultItem[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedFileType, setSelectedFileType] = useState<string>("all");
+
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -189,225 +238,480 @@ export function VaultMainView({ vaultKey, onLock }: VaultMainViewProps) {
     );
   }
 
+  // Dual simultaneous filtering: Category + File Type
   const filteredItems = useMemo(() => {
-    if (selectedCategory === "all") return items;
-    return items.filter((i) => i.category === selectedCategory);
-  }, [items, selectedCategory]);
+    return items.filter((i) => {
+      const matchCat = selectedCategory === "all" || i.category.toLowerCase() === selectedCategory.toLowerCase();
+      const itemType = getItemType(i);
+      const matchType = selectedFileType === "all" || itemType === selectedFileType;
+      return matchCat && matchType;
+    });
+  }, [items, selectedCategory, selectedFileType]);
 
   const favorites = useMemo(() => filteredItems.filter((i) => i.isFavorite), [filteredItems]);
   const nonFavorites = useMemo(() => filteredItems.filter((i) => !i.isFavorite), [filteredItems]);
 
-  function renderGridItem(item: VaultItem) {
+  function handleFilterDropdownChange(val: string) {
+    if (val.startsWith("cat:")) {
+      setSelectedCategory(val.substring(4));
+    } else if (val.startsWith("type:")) {
+      setSelectedFileType(val.substring(5));
+    }
+  }
+
+  function handleCycleLayout() {
+    setActiveLayout((prev) => {
+      if (prev === "grid") return "split";
+      if (prev === "split") return "list";
+      return "grid";
+    });
+  }
+
+  function handleCycleColumns() {
+    setActiveColumns((prev) => {
+      if (prev === 3) return 4;
+      if (prev === 4) return 5;
+      if (prev === 5) return 6;
+      return 3;
+    });
+  }
+
+  function renderItemActions(item: VaultItem) {
     const hasAttachments = item.attachments && item.attachments.length > 0;
     const firstAttachment = hasAttachments ? item.attachments[0] : undefined;
-    const displayTitle = item.title?.trim() || firstAttachment?.name || "Untitled Item";
-
-    // Index both the title and all attachment file names so users can find items by either title or filename
-    const keywords = [
-      ...(item.title?.trim() ? [item.title.trim()] : []),
-      ...item.attachments.map((a) => a.name),
-      ...(item.url ? [item.url] : []),
-      item.category,
-    ];
+    const suggestedApps = firstAttachment ? getSuggestedAppsForFile(firstAttachment.name) : [];
 
     return (
-      <Grid.Item
-        key={item.id}
-        id={item.id}
-        title={displayTitle}
-        subtitle={formatRelativeDateTime(item.createdAt)}
-        keywords={keywords}
-        content={getItemGridContent(item, vaultKey)}
-        actions={
-          <ActionPanel>
-            {/* 1. PRIMARY ACTION: Opens inside Raycast on Enter and on Click! */}
-            <Action.Push
-              title="Open Inside Raycast"
-              icon={Icon.Eye}
-              target={
-                <VaultItemDetailView
-                  item={item}
-                  vaultKey={vaultKey}
-                  profiles={profiles}
-                  onItemUpdated={handleSaveItem}
-                  onItemDeleted={handleDeleteItemDirect}
-                />
-              }
+      <ActionPanel>
+        {/* 1. PRIMARY ACTION: Opens inside Raycast */}
+        <Action.Push
+          title="Open Inside Raycast"
+          icon={Icon.Eye}
+          target={
+            <VaultItemDetailView
+              item={item}
+              vaultKey={vaultKey}
+              profiles={profiles}
+              onItemUpdated={handleSaveItem}
+              onItemDeleted={handleDeleteItemDirect}
             />
+          }
+        />
 
-            {/* 2. EXTERNAL OPENER: Triggered by Ctrl + Enter directly from Grid! */}
-            {hasAttachments && firstAttachment ? (
-              <Action
-                title={
-                  firstAttachment.customAppPath
-                    ? `Open in ${path.basename(firstAttachment.customAppPath)}`
-                    : `Open in Default App (${firstAttachment.name})`
-                }
-                icon={Icon.ArrowRight}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleOpenAttachment(firstAttachment)}
-              />
-            ) : item.url ? (
-              <Action
-                title="Launch Destination URL"
-                icon={Icon.Globe}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleLaunch(item, false)}
-              />
-            ) : null}
+        {/* 2. SECONDARY: Launch externally */}
+        {firstAttachment ? (
+          <Action
+            title={`Open File in Default App (${path.extname(firstAttachment.name)})`}
+            icon={Icon.ArrowNe}
+            shortcut={Keyboard.Shortcut.Common.Open}
+            onAction={() => handleOpenAttachment(firstAttachment)}
+          />
+        ) : item.url ? (
+          <Action
+            title="Open URL in Browser"
+            icon={Icon.Globe}
+            shortcut={Keyboard.Shortcut.Common.Open}
+            onAction={() => handleLaunch(item, false)}
+          />
+        ) : null}
 
-            {/* 3. Open With Submenu: Triggered by Ctrl + Shift + O */}
-            {hasAttachments && firstAttachment ? (
-              <ActionPanel.Submenu
-                title="Open with…"
-                icon={Icon.AppWindow}
-                shortcut={Keyboard.Shortcut.Common.OpenWith}
-              >
+        {/* 3. Open With Submenu */}
+        {firstAttachment ? (
+          <ActionPanel.Submenu title="Open with…" icon={Icon.ChevronRight} shortcut={Keyboard.Shortcut.Common.OpenWith}>
+            <Action
+              title="System 'Open with…' Dialog"
+              icon={Icon.Window}
+              onAction={() => handleOpenAttachment(firstAttachment, "__system_dialog__")}
+            />
+            <ActionPanel.Section title={`Suggested Apps for ${firstAttachment.name}`}>
+              {suggestedApps.map((app) => (
                 <Action
-                  title="Windows 'Open with' Dialog…"
-                  icon={Icon.Window}
-                  onAction={() => handleOpenAttachment(firstAttachment, "__system_dialog__")}
+                  key={app.id}
+                  title={app.title}
+                  icon={Icon.AppWindow}
+                  onAction={() => handleOpenAttachment(firstAttachment, app.id)}
                 />
-                <ActionPanel.Section title={`Suggested Apps for ${firstAttachment.name}`}>
-                  {getSuggestedAppsForFile(firstAttachment.name).map((app) => (
-                    <Action
-                      key={app.id}
-                      title={`Open in ${app.title}`}
-                      icon={Icon.AppWindow}
-                      onAction={() => handleOpenAttachment(firstAttachment, app.id)}
-                    />
-                  ))}
-                </ActionPanel.Section>
-                <Action
-                  title="Browse Other App on PC…"
-                  icon={Icon.Finder}
-                  onAction={async () => {
-                    const picked = await browseExecutableOnWindows();
-                    if (picked) {
-                      await handleOpenAttachment(firstAttachment, picked);
-                    }
-                  }}
-                />
-              </ActionPanel.Submenu>
-            ) : null}
-
-            {/* 4. Set Default App: Triggered by Ctrl + O */}
-            {hasAttachments && firstAttachment ? (
-              <Action.Push
-                title="Set Default App for File…"
-                icon={Icon.Gear}
-                shortcut={Keyboard.Shortcut.Common.Open}
-                target={
-                  <SetCustomAppForm
-                    item={item}
-                    attachment={firstAttachment}
-                    mode="set_default"
-                    onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
-                  />
-                }
-              />
-            ) : null}
-
-            <ActionPanel.Section title="Management">
-              <Action.Push
-                title="Add New Vault Item"
-                icon={Icon.Plus}
-                shortcut={Keyboard.Shortcut.Common.New}
-                target={<VaultItemForm categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />}
-              />
-              <Action.Push
-                title="Edit Item"
-                icon={Icon.Pencil}
-                shortcut={Keyboard.Shortcut.Common.Edit}
-                target={
-                  <VaultItemForm
-                    initialItem={item}
-                    categories={categories}
-                    vaultKey={vaultKey}
-                    onSave={handleSaveItem}
-                  />
-                }
-              />
-              <Action
-                title={item.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
-                icon={Icon.Star}
-                shortcut={{ modifiers: ["ctrl"], key: "f" }}
-                onAction={() => handleToggleFavorite(item.id)}
-              />
-              <Action
-                title="Delete Vault Item"
-                icon={Icon.Trash}
-                style={Action.Style.Destructive}
-                shortcut={Keyboard.Shortcut.Common.Remove}
-                onAction={() => handleDeleteItem(item)}
-              />
-              <Action.Push
-                title="Configure Security Question"
-                icon={Icon.Shield}
-                target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
-              />
-              <Action
-                title="Lock Vault Now"
-                icon={Icon.Lock}
-                shortcut={{ modifiers: ["ctrl"], key: "l" }}
-                onAction={onLock}
-              />
+              ))}
             </ActionPanel.Section>
-          </ActionPanel>
-        }
-      />
+            <Action
+              title="Browse for .Exe on PC…"
+              icon={Icon.MagnifyingGlass}
+              onAction={async () => {
+                const exe = await browseExecutableOnWindows();
+                if (exe) {
+                  await handleOpenAttachment(firstAttachment, exe);
+                }
+              }}
+            />
+          </ActionPanel.Submenu>
+        ) : null}
+
+        {/* 4. Set Default App */}
+        {firstAttachment ? (
+          <Action.Push
+            title="Configure Default App for This File"
+            icon={Icon.Gear}
+            shortcut={{ modifiers: ["ctrl", "shift"], key: "a" }}
+            target={
+              <SetCustomAppForm
+                item={item}
+                attachment={firstAttachment}
+                mode="set_default"
+                onSaved={(newApp) => handleSetCustomApp(item.id, firstAttachment.id, newApp)}
+              />
+            }
+          />
+        ) : null}
+
+        {/* 5. Filter Submenus */}
+        <ActionPanel.Section title="Filter & View">
+          <ActionPanel.Submenu
+            title={`Filter File Type (${selectedFileType})`}
+            icon={Icon.Filter}
+            shortcut={{ modifiers: ["ctrl"], key: "t" }}
+          >
+            {FILE_TYPES.map((t) => (
+              <Action key={t.id} title={t.title} icon={t.icon} onAction={() => setSelectedFileType(t.id)} />
+            ))}
+          </ActionPanel.Submenu>
+
+          <ActionPanel.Submenu
+            title={`Filter Category (${selectedCategory})`}
+            icon={Icon.Tag}
+            shortcut={{ modifiers: ["ctrl"], key: "c" }}
+          >
+            <Action title="All Categories" icon={Icon.Tag} onAction={() => setSelectedCategory("all")} />
+            {categories.map((cat) => (
+              <Action key={cat} title={cat} icon={Icon.Tag} onAction={() => setSelectedCategory(cat)} />
+            ))}
+          </ActionPanel.Submenu>
+
+          {(selectedCategory !== "all" || selectedFileType !== "all") && (
+            <Action
+              title="Clear All Filters"
+              icon={Icon.XMarkCircle}
+              shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
+              onAction={() => {
+                setSelectedCategory("all");
+                setSelectedFileType("all");
+              }}
+            />
+          )}
+
+          <Action
+            title={`Switch Layout (${activeLayout.toUpperCase()})`}
+            icon={Icon.AppWindowGrid3x3}
+            shortcut={{ modifiers: ["ctrl", "shift"], key: "l" }}
+            onAction={handleCycleLayout}
+          />
+
+          {activeLayout === "grid" && (
+            <Action
+              title={`Cycle Grid Columns (${activeColumns})`}
+              icon={Icon.AppWindowGrid3x3}
+              shortcut={Keyboard.Shortcut.Common.Copy}
+              onAction={handleCycleColumns}
+            />
+          )}
+        </ActionPanel.Section>
+
+        {/* 6. Management */}
+        <ActionPanel.Section title="Management">
+          <Action.Push
+            title="Add New Vault Item"
+            icon={Icon.Plus}
+            shortcut={Keyboard.Shortcut.Common.New}
+            target={<VaultItemForm categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />}
+          />
+          <Action.Push
+            title="Edit Item"
+            icon={Icon.Pencil}
+            shortcut={Keyboard.Shortcut.Common.Edit}
+            target={
+              <VaultItemForm initialItem={item} categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />
+            }
+          />
+          <Action
+            title={item.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
+            icon={Icon.Star}
+            shortcut={{ modifiers: ["ctrl"], key: "f" }}
+            onAction={() => handleToggleFavorite(item.id)}
+          />
+          <Action
+            title="Delete Vault Item"
+            icon={Icon.Trash}
+            style={Action.Style.Destructive}
+            shortcut={Keyboard.Shortcut.Common.Remove}
+            onAction={() => handleDeleteItem(item)}
+          />
+          <Action.Push
+            title="Configure Security Question"
+            icon={Icon.Shield}
+            target={<VaultSecurityQuestionView vaultKey={vaultKey} />}
+          />
+          <Action
+            title="Lock Vault Now"
+            icon={Icon.Lock}
+            shortcut={{ modifiers: ["ctrl"], key: "l" }}
+            onAction={onLock}
+          />
+        </ActionPanel.Section>
+      </ActionPanel>
     );
   }
 
+  function renderItemPreviewMarkdown(item: VaultItem): string {
+    const lines: string[] = [];
+    const firstAtt = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+
+    if (firstAtt) {
+      const cat = getFileCategory(firstAtt.name);
+      try {
+        const localPath = getDecryptedAttachmentPath(firstAtt, vaultKey);
+        if (localPath && fs.existsSync(localPath)) {
+          if (cat === "image") {
+            lines.push(`![](${localPath})`);
+          } else if (cat === "video") {
+            const thumb = `${localPath}.thumb.jpg`;
+            if (fs.existsSync(thumb)) {
+              lines.push(`![](${thumb})`);
+            }
+          } else if (cat === "pdf") {
+            const preview = `${localPath}.preview.jpg`;
+            if (fs.existsSync(preview)) {
+              lines.push(`![](${preview})`);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      lines.push(`## ${item.title || firstAtt.name}`);
+      lines.push(`**File:** \`${firstAtt.name}\` (${(firstAtt.size / 1024).toFixed(1)} KB)`);
+      lines.push(`**Category:** ${item.category}`);
+    } else {
+      lines.push(`## ${item.title || "Encrypted Note"}`);
+      lines.push(`**Category:** ${item.category}`);
+    }
+
+    if (item.url) {
+      lines.push(`**URL:** [${item.url}](${item.url})`);
+    }
+
+    if (item.notes && item.notes.trim()) {
+      lines.push(`\n---\n\n### 📝 Notes\n${item.notes}`);
+    }
+
+    return lines.join("\n\n");
+  }
+
+  function getActiveFilterLabel(): string {
+    const parts: string[] = [];
+    if (selectedCategory !== "all") parts.push(`📁 ${selectedCategory}`);
+    if (selectedFileType !== "all") {
+      const typeObj = FILE_TYPES.find((t) => t.id === selectedFileType);
+      parts.push(`🏷️ ${typeObj?.title || selectedFileType}`);
+    }
+    return parts.length > 0 ? parts.join(" • ") : "All Items";
+  }
+
+  // Common Dropdown Component
+  function renderDropdown(DropdownComp: typeof Grid.Dropdown | typeof List.Dropdown) {
+    return (
+      <DropdownComp
+        tooltip={`Filter: ${getActiveFilterLabel()}`}
+        value={selectedCategory !== "all" ? `cat:${selectedCategory}` : `type:${selectedFileType}`}
+        onChange={handleFilterDropdownChange}
+      >
+        <DropdownComp.Section title="Categories">
+          <DropdownComp.Item title="📁 All Categories" value="cat:all" />
+          {categories.map((cat) => (
+            <DropdownComp.Item key={`cat:${cat}`} title={`📁 ${cat.toUpperCase()}`} value={`cat:${cat}`} />
+          ))}
+        </DropdownComp.Section>
+
+        <DropdownComp.Section title="File Types">
+          {FILE_TYPES.map((t) => (
+            <DropdownComp.Item key={`type:${t.id}`} title={t.title} value={`type:${t.id}`} icon={t.icon} />
+          ))}
+        </DropdownComp.Section>
+      </DropdownComp>
+    );
+  }
+
+  // 1. SPLIT VIEW (List with Live Preview Pane)
+  if (activeLayout === "split") {
+    return (
+      <List
+        isShowingDetail={true}
+        isLoading={isLoading}
+        searchBarPlaceholder={`Filter in ${getActiveFilterLabel()}...`}
+        searchBarAccessory={renderDropdown(List.Dropdown)}
+      >
+        {filteredItems.length === 0 ? (
+          <List.EmptyView
+            icon={Icon.Lock}
+            title="No Vault Items"
+            description="Press Ctrl+N to add an encrypted file, credential, or bookmark."
+          />
+        ) : (
+          filteredItems.map((item) => {
+            const firstAtt = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+            const displayTitle = item.title?.trim() || firstAtt?.name || "Untitled Item";
+
+            return (
+              <List.Item
+                key={item.id}
+                id={item.id}
+                title={displayTitle}
+                subtitle={item.isFavorite ? "⭐ Favorite" : undefined}
+                icon={getItemGridContent(item, vaultKey)}
+                actions={renderItemActions(item)}
+                detail={
+                  <List.Item.Detail
+                    markdown={renderItemPreviewMarkdown(item)}
+                    metadata={
+                      <List.Item.Detail.Metadata>
+                        <List.Item.Detail.Metadata.Label title="Title" text={displayTitle} />
+                        <List.Item.Detail.Metadata.TagList title="Category">
+                          <List.Item.Detail.Metadata.TagList.Item text={item.category} color={Color.Blue} />
+                        </List.Item.Detail.Metadata.TagList>
+                        {item.url && <List.Item.Detail.Metadata.Link title="Link" target={item.url} text={item.url} />}
+                        {firstAtt && (
+                          <>
+                            <List.Item.Detail.Metadata.Label title="Attachment" text={firstAtt.name} />
+                            <List.Item.Detail.Metadata.Label
+                              title="Size"
+                              text={`${(firstAtt.size / 1024).toFixed(1)} KB`}
+                            />
+                          </>
+                        )}
+                        <List.Item.Detail.Metadata.Label
+                          title="Modified"
+                          text={formatRelativeDateTime(item.createdAt)}
+                        />
+                      </List.Item.Detail.Metadata>
+                    }
+                  />
+                }
+              />
+            );
+          })
+        )}
+      </List>
+    );
+  }
+
+  // 2. COMPACT LIST VIEW
+  if (activeLayout === "list") {
+    return (
+      <List
+        isShowingDetail={false}
+        isLoading={isLoading}
+        searchBarPlaceholder={`Filter in ${getActiveFilterLabel()}...`}
+        searchBarAccessory={renderDropdown(List.Dropdown)}
+      >
+        {filteredItems.length === 0 ? (
+          <List.EmptyView
+            icon={Icon.Lock}
+            title="No Vault Items"
+            description="Press Ctrl+N to add an encrypted file, credential, or bookmark."
+          />
+        ) : (
+          filteredItems.map((item) => {
+            const firstAtt = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+            const displayTitle = item.title?.trim() || firstAtt?.name || "Untitled Item";
+
+            return (
+              <List.Item
+                key={item.id}
+                id={item.id}
+                title={displayTitle}
+                subtitle={item.url ? item.url : firstAtt ? firstAtt.name : undefined}
+                icon={getItemGridContent(item, vaultKey)}
+                accessories={[
+                  item.isFavorite ? { icon: Icon.Star, tooltip: "Favorite" } : {},
+                  { tag: item.category, tooltip: "Category" },
+                  { text: formatRelativeDateTime(item.createdAt) },
+                ]}
+                actions={renderItemActions(item)}
+              />
+            );
+          })
+        )}
+      </List>
+    );
+  }
+
+  // 3. GRID CARDS VIEW (Default)
   return (
     <Grid
-      columns={4}
+      columns={activeColumns}
       aspectRatio="16/9"
       fit={Grid.Fit.Fill}
       isLoading={isLoading}
-      searchBarPlaceholder="Filter vault items by name or notes..."
-      searchBarAccessory={
-        <Grid.Dropdown
-          tooltip="Filter by Category"
-          value={selectedCategory}
-          onChange={(newCategory) => setSelectedCategory(newCategory)}
-        >
-          <Grid.Dropdown.Item title="All Items" value="all" />
-          <Grid.Dropdown.Section title="Categories">
-            {categories.map((cat) => (
-              <Grid.Dropdown.Item key={cat} title={cat.toUpperCase()} value={cat} />
-            ))}
-          </Grid.Dropdown.Section>
-        </Grid.Dropdown>
-      }
+      searchBarPlaceholder={`Filter in ${getActiveFilterLabel()}...`}
+      searchBarAccessory={renderDropdown(Grid.Dropdown)}
     >
       {filteredItems.length === 0 ? (
         <Grid.EmptyView
           icon={Icon.Lock}
           title="No Vault Items"
           description="Press Ctrl+N to add an encrypted file, credential, or bookmark."
-          actions={
-            <ActionPanel>
-              <Action.Push
-                title="Add New Vault Item"
-                icon={Icon.Plus}
-                shortcut={Keyboard.Shortcut.Common.New}
-                target={<VaultItemForm categories={categories} vaultKey={vaultKey} onSave={handleSaveItem} />}
-              />
-              <Action
-                title="Lock Vault Now"
-                icon={Icon.Lock}
-                shortcut={{ modifiers: ["ctrl"], key: "l" }}
-                onAction={onLock}
-              />
-            </ActionPanel>
-          }
         />
       ) : (
         <>
-          {favorites.length > 0 ? <Grid.Section title="Favorites">{favorites.map(renderGridItem)}</Grid.Section> : null}
+          {favorites.length > 0 && (
+            <Grid.Section title="Favorites">
+              {favorites.map((item) => {
+                const firstAtt = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+                const displayTitle = item.title?.trim() || firstAtt?.name || "Untitled Item";
+                const keywords = [
+                  ...(item.title?.trim() ? [item.title.trim()] : []),
+                  ...item.attachments.map((a) => a.name),
+                  ...(item.url ? [item.url] : []),
+                  item.category,
+                ];
+
+                return (
+                  <Grid.Item
+                    key={item.id}
+                    id={item.id}
+                    title={displayTitle}
+                    subtitle={formatRelativeDateTime(item.createdAt)}
+                    keywords={keywords}
+                    content={getItemGridContent(item, vaultKey)}
+                    actions={renderItemActions(item)}
+                  />
+                );
+              })}
+            </Grid.Section>
+          )}
+
           <Grid.Section title={favorites.length > 0 ? "All Items" : undefined}>
-            {nonFavorites.map(renderGridItem)}
+            {nonFavorites.map((item) => {
+              const firstAtt = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
+              const displayTitle = item.title?.trim() || firstAtt?.name || "Untitled Item";
+              const keywords = [
+                ...(item.title?.trim() ? [item.title.trim()] : []),
+                ...item.attachments.map((a) => a.name),
+                ...(item.url ? [item.url] : []),
+                item.category,
+              ];
+
+              return (
+                <Grid.Item
+                  key={item.id}
+                  id={item.id}
+                  title={displayTitle}
+                  subtitle={formatRelativeDateTime(item.createdAt)}
+                  keywords={keywords}
+                  content={getItemGridContent(item, vaultKey)}
+                  actions={renderItemActions(item)}
+                />
+              );
+            })}
           </Grid.Section>
         </>
       )}

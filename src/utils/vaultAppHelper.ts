@@ -1,6 +1,8 @@
 import path from "path";
 import { execFile } from "child_process";
-import { Icon, Color, Image } from "@raycast/api";
+import fs from "fs";
+import { spawnSync } from "child_process";
+import { Icon, Color, Image, environment } from "@raycast/api";
 import { VaultItem } from "../types/vault";
 import { getDecryptedAttachmentPath } from "./vaultStorage";
 
@@ -11,7 +13,7 @@ export interface AppPreset {
 
 export function getFileCategory(
   fileName: string,
-): "image" | "pdf" | "video" | "audio" | "code" | "document" | "archive" | "other" {
+): "image" | "pdf" | "video" | "audio" | "code" | "document" | "spreadsheet" | "archive" | "other" {
   const ext = path.extname(fileName).toLowerCase();
   if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tiff", ".avif"].includes(ext)) {
     return "image";
@@ -24,6 +26,9 @@ export function getFileCategory(
   }
   if ([".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".wma"].includes(ext)) {
     return "audio";
+  }
+  if ([".csv", ".tsv", ".xlsx", ".xls"].includes(ext)) {
+    return "spreadsheet";
   }
   if (
     [
@@ -52,7 +57,7 @@ export function getFileCategory(
   ) {
     return "code";
   }
-  if ([".txt", ".log", ".csv", ".doc", ".docx", ".rtf", ".odt"].includes(ext)) {
+  if ([".txt", ".log", ".doc", ".docx", ".rtf", ".odt"].includes(ext)) {
     return "document";
   }
   if ([".zip", ".rar", ".7z", ".tar", ".gz"].includes(ext)) {
@@ -145,6 +150,31 @@ export function formatRelativeDateTime(timestamp: number): string {
  * For images, decrypts to temp storage and returns the local file path.
  * For other types, returns rich themed icons.
  */
+function getCardAsset(cardName: string): string {
+  const candidates = [
+    path.join(environment.assetsPath, "vault_cards", cardName),
+    path.resolve(__dirname, "assets/vault_cards", cardName),
+    path.resolve(__dirname, "../assets/vault_cards", cardName),
+    path.resolve("assets/vault_cards", cardName),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return `vault_cards/${cardName}`;
+}
+
+function getShellThumbnailExe(): string | null {
+  const candidates = [
+    path.resolve(__dirname, "bin/ShellThumbnail.exe"),
+    path.resolve(__dirname, "../bin/ShellThumbnail.exe"),
+    path.resolve("bin/ShellThumbnail.exe"),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 export function getItemGridContent(item: VaultItem, vaultKey: Buffer): Image.ImageLike {
   const firstAttachment = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
 
@@ -153,40 +183,94 @@ export function getItemGridContent(item: VaultItem, vaultKey: Buffer): Image.Ima
     if (cat === "image") {
       try {
         const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
-        if (localPath) {
+        if (localPath && fs.existsSync(localPath)) {
           return { source: localPath };
         }
       } catch {
-        // fallback to icon
+        // fallback
       }
       return { source: Icon.Image, tintColor: Color.Blue };
     }
-    if (cat === "pdf") {
-      return { source: Icon.Document, tintColor: Color.Red };
-    }
+
     if (cat === "video") {
-      return { source: Icon.Video, tintColor: Color.Purple };
+      try {
+        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
+        if (localPath && fs.existsSync(localPath)) {
+          const thumbPath = `${localPath}.thumb.jpg`;
+          if (fs.existsSync(thumbPath)) {
+            return { source: thumbPath };
+          }
+          const exe = getShellThumbnailExe();
+          if (exe) {
+            const res = spawnSync(exe, [localPath, thumbPath, "360"], {
+              windowsHide: true,
+              timeout: 4000,
+            });
+            if (res.status === 0 && fs.existsSync(thumbPath)) {
+              return { source: thumbPath };
+            }
+          }
+        }
+      } catch {
+        // fallback
+      }
+      return { source: getCardAsset("video_card.svg") };
     }
+
+    if (cat === "pdf") {
+      try {
+        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
+        if (localPath && fs.existsSync(localPath)) {
+          const previewPath = `${localPath}.preview.jpg`;
+          if (fs.existsSync(previewPath)) {
+            return { source: previewPath };
+          }
+        }
+      } catch {
+        // fallback
+      }
+      return { source: getCardAsset("doc_card.svg") };
+    }
+
     if (cat === "audio") {
-      return { source: Icon.SpeakerOn, tintColor: Color.Magenta };
+      try {
+        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
+        if (localPath && fs.existsSync(localPath)) {
+          const artPath = `${localPath}.art.jpg`;
+          if (fs.existsSync(artPath)) {
+            return { source: artPath };
+          }
+        }
+      } catch {
+        // fallback
+      }
+      return { source: getCardAsset("audio_card.svg") };
     }
+
+    if (cat === "spreadsheet") {
+      return { source: getCardAsset("sheet_card.svg") };
+    }
+
     if (cat === "code") {
-      return { source: Icon.Code, tintColor: Color.Green };
+      return { source: getCardAsset("code_card.svg") };
     }
+
     if (cat === "document") {
-      return { source: Icon.Paragraph, tintColor: Color.Orange };
+      return { source: getCardAsset("doc_card.svg") };
     }
+
     if (cat === "archive") {
-      return { source: Icon.Folder, tintColor: Color.Yellow };
+      return { source: getCardAsset("archive_card.svg") };
     }
-    return { source: Icon.Document, tintColor: Color.PrimaryText };
+
+    return { source: getCardAsset("doc_card.svg") };
   }
 
   if (item.url) {
     return { source: Icon.Globe, tintColor: Color.Blue };
   }
 
-  return { source: Icon.Lock, tintColor: Color.SecondaryText };
+  return { source: getCardAsset("doc_card.svg") };
 }
 
 /**

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#241424"/>
+      <stop offset="100%" stop-color="#140a14"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#c026d3"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" rx="16" fill="url(#bg)"/>
+  <rect x="1" y="1" width="398" height="298" rx="15" fill="none" stroke="#4a1d4a" stroke-width="1.5"/>
+  
+  <rect x="290" y="16" width="90" height="22" rx="6" fill="#701a75" stroke="#a21caf" stroke-width="1"/>
+  <text x="335" y="31" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="700" fill="#f5d0fe" text-anchor="middle" letter-spacing="0.5">AUDIO TRACK</text>
+  
+  <!-- Vinyl Record & Wave -->
+  <g transform="translate(140, 60)">
+    <circle cx="60" cy="60" r="55" fill="#1c0e1e" stroke="#581c87" stroke-width="2"/>
+    <circle cx="60" cy="60" r="42" fill="none" stroke="#3b0764" stroke-width="1.5" stroke-dasharray="8,4"/>
+    <circle cx="60" cy="60" r="28" fill="none" stroke="#3b0764" stroke-width="1.5"/>
+    <circle cx="60" cy="60" r="16" fill="url(#purpleGrad)"/>
+    <circle cx="60" cy="60" r="5" fill="#140a14"/>
+  </g>
+  
+  <!-- Equalizer Bars -->
+  <g transform="translate(70, 195)">
+    <rect x="0" y="35" width="8" height="30" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="16" y="20" width="8" height="45" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="32" y="10" width="8" height="55" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="48" y="25" width="8" height="40" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="64" y="5" width="8" height="60" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="80" y="18" width="8" height="47" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="96" y="30" width="8" height="35" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="112" y="15" width="8" height="50" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="128" y="0" width="8" height="65" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="144" y="22" width="8" height="43" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="160" y="8" width="8" height="57" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="176" y="28" width="8" height="37" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="192" y="14" width="8" height="51" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="208" y="32" width="8" height="33" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="224" y="12" width="8" height="53" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="240" y="24" width="8" height="41" rx="4" fill="url(#purpleGrad)"/>
+    <rect x="256" y="38" width="8" height="27" rx="4" fill="url(#purpleGrad)"/>
+  </g>
+</svg>

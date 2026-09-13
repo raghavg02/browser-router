@@ -82,6 +82,54 @@
       "type": "textfield",
       "required": false,
       "placeholder": "https://kagi.com/search?q=%s"
+    },
+    {
+      "name": "vaultLayout",
+      "title": "Vault Browsing Layout",
+      "description": "Default layout style for viewing your encrypted vault items",
+      "type": "dropdown",
+      "required": false,
+      "default": "grid",
+      "data": [
+        {
+          "title": "Grid Cards (Visual)",
+          "value": "grid"
+        },
+        {
+          "title": "Split Pane (List + Live Preview)",
+          "value": "split"
+        },
+        {
+          "title": "List View (Compact)",
+          "value": "list"
+        }
+      ]
+    },
+    {
+      "name": "vaultGridColumns",
+      "title": "Grid Columns (Cards per row)",
+      "description": "Number of cards to display in one row in Grid layout",
+      "type": "dropdown",
+      "required": false,
+      "default": "4",
+      "data": [
+        {
+          "title": "3 Cards (Large)",
+          "value": "3"
+        },
+        {
+          "title": "4 Cards (Standard)",
+          "value": "4"
+        },
+        {
+          "title": "5 Cards (Compact)",
+          "value": "5"
+        },
+        {
+          "title": "6 Cards (Dense)",
+          "value": "6"
+        }
+      ]
     }
   ],
   "dependencies": {
