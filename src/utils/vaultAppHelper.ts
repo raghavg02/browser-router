@@ -1,10 +1,9 @@
 import path from "path";
-import { execFile } from "child_process";
+import { execFile, spawnSync } from "child_process";
 import fs from "fs";
-import { spawnSync } from "child_process";
 import { Icon, Color, Image, environment } from "@raycast/api";
-import { VaultItem } from "../types/vault";
-import { getDecryptedAttachmentPath } from "./vaultStorage";
+import { VaultItem, VaultAttachment } from "../types/vault";
+import { getVaultFilesDir, getTempDecryptedDir, getDecryptedAttachmentPath } from "./vaultStorage";
 
 export interface AppPreset {
   id: string;
@@ -34,17 +33,20 @@ export function getFileCategory(
     [
       ".js",
       ".ts",
-      ".tsx",
       ".jsx",
+      ".tsx",
       ".json",
       ".html",
       ".css",
       ".py",
+      ".java",
       ".c",
       ".cpp",
       ".cs",
-      ".rs",
       ".go",
+      ".rs",
+      ".php",
+      ".rb",
       ".sh",
       ".bat",
       ".ps1",
@@ -83,73 +85,44 @@ export function getSuggestedAppsForFile(fileName: string): AppPreset[] {
         { id: "AcroRd32.exe", title: "Adobe Acrobat Reader" },
       ];
     case "video":
-    case "audio":
       return [
         { id: "vlc.exe", title: "VLC Media Player" },
         { id: "wmplayer.exe", title: "Windows Media Player" },
+        { id: "mpv.exe", title: "MPV Player" },
+      ];
+    case "audio":
+      return [
+        { id: "wmplayer.exe", title: "Windows Media Player" },
+        { id: "vlc.exe", title: "VLC Media Player" },
+        { id: "foobar2000.exe", title: "foobar2000" },
       ];
     case "code":
-      return [
-        { id: "code.cmd", title: "Visual Studio Code" },
-        { id: "notepad.exe", title: "Notepad" },
-      ];
     case "document":
       return [
-        { id: "notepad.exe", title: "Notepad" },
         { id: "code.cmd", title: "Visual Studio Code" },
-        { id: "write.exe", title: "WordPad" },
+        { id: "notepad.exe", title: "Notepad" },
+        { id: "notepad++.exe", title: "Notepad++" },
+      ];
+    case "spreadsheet":
+      return [
+        { id: "excel.exe", title: "Microsoft Excel" },
+        { id: "code.cmd", title: "Visual Studio Code" },
+        { id: "notepad.exe", title: "Notepad" },
       ];
     case "archive":
       return [
         { id: "explorer.exe", title: "Windows Explorer" },
-        { id: "7zFM.exe", title: "7-Zip" },
+        { id: "WinRAR.exe", title: "WinRAR" },
+        { id: "7zFM.exe", title: "7-Zip File Manager" },
       ];
     default:
       return [
         { id: "notepad.exe", title: "Notepad" },
-        { id: "msedge.exe", title: "Microsoft Edge" },
+        { id: "explorer.exe", title: "Windows Explorer" },
       ];
   }
 }
 
-/**
- * Formats a timestamp into a natural, friendly string matching modern Raycast grids
- * (e.g. "Today, 2:26 PM", "Yesterday, 7:20 AM", or "Sep 10, 4:15 PM")
- */
-export function formatRelativeDateTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-
-  const timeStr = date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-
-  if (isToday) {
-    return `Today, ${timeStr}`;
-  }
-  if (isYesterday) {
-    return `Yesterday, ${timeStr}`;
-  }
-
-  const isSameYear = date.getFullYear() === now.getFullYear();
-  if (isSameYear) {
-    return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${timeStr}`;
-  }
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-/**
- * Returns the card thumbnail / icon for a vault item in the Grid.
- * For images, decrypts to temp storage and returns the local file path.
- * For other types, returns rich themed icons.
- */
 function getCardAsset(cardName: string): string {
   const candidates = [
     path.join(environment.assetsPath, "vault_cards", cardName),
@@ -163,7 +136,7 @@ function getCardAsset(cardName: string): string {
   return `vault_cards/${cardName}`;
 }
 
-function getShellThumbnailExe(): string | null {
+export function getShellThumbnailExe(): string | null {
   const candidates = [
     path.resolve(__dirname, "bin/ShellThumbnail.exe"),
     path.resolve(__dirname, "../bin/ShellThumbnail.exe"),
@@ -175,94 +148,87 @@ function getShellThumbnailExe(): string | null {
   return null;
 }
 
-export function getItemGridContent(item: VaultItem, vaultKey: Buffer): Image.ImageLike {
+/**
+ * Generates and caches a video frame thumbnail asynchronously.
+ * Saves permanently to vault_files/{attachment.id}.thumb.jpg so it only generates once.
+ */
+export async function extractVideoThumbnailAsync(
+  attachment: VaultAttachment,
+  vaultKey: Buffer,
+): Promise<string | null> {
+  const persistentThumb = path.join(getVaultFilesDir(), `${attachment.id}.thumb.jpg`);
+  if (fs.existsSync(persistentThumb)) {
+    return persistentThumb;
+  }
+
+  try {
+    const localPath = getDecryptedAttachmentPath(attachment, vaultKey);
+    if (!localPath || !fs.existsSync(localPath)) return null;
+
+    const exe = getShellThumbnailExe();
+    if (!exe) return null;
+
+    const res = spawnSync(exe, [localPath, persistentThumb, "360"], {
+      windowsHide: true,
+      timeout: 10000,
+    });
+
+    if (res.status === 0 && fs.existsSync(persistentThumb)) {
+      return persistentThumb;
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+
+/**
+ * Fast, non-blocking card content provider.
+ * Returns pre-existing thumbnail images if available, otherwise immediate high-end visual cards.
+ * NEVER blocks or runs heavy decryption inside React render!
+ */
+export function getItemGridContent(item: VaultItem): Image.ImageLike {
   const firstAttachment = item.attachments && item.attachments.length > 0 ? item.attachments[0] : undefined;
 
   if (firstAttachment) {
     const cat = getFileCategory(firstAttachment.name);
-    if (cat === "image") {
-      try {
-        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
-        if (localPath && fs.existsSync(localPath)) {
-          return { source: localPath };
-        }
-      } catch {
-        // fallback
-      }
-      return { source: Icon.Image, tintColor: Color.Blue };
+
+    // 1. Check persistent thumbnail in vault_files
+    const persistentThumb = path.join(getVaultFilesDir(), `${firstAttachment.id}.thumb.jpg`);
+    if (fs.existsSync(persistentThumb)) {
+      return { source: persistentThumb };
     }
 
-    if (cat === "video") {
-      try {
-        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
-        if (localPath && fs.existsSync(localPath)) {
-          const thumbPath = `${localPath}.thumb.jpg`;
-          if (fs.existsSync(thumbPath)) {
-            return { source: thumbPath };
-          }
-          const exe = getShellThumbnailExe();
-          if (exe) {
-            const res = spawnSync(exe, [localPath, thumbPath, "360"], {
-              windowsHide: true,
-              timeout: 4000,
-            });
-            if (res.status === 0 && fs.existsSync(thumbPath)) {
-              return { source: thumbPath };
-            }
-          }
-        }
-      } catch {
-        // fallback
-      }
-      return { source: getCardAsset("video_card.svg") };
+    // 2. Check temporary thumbnail or cover preview
+    const tempDir = getTempDecryptedDir();
+    const tempFile = path.join(tempDir, `${firstAttachment.id}_${firstAttachment.name}`);
+    const tempThumb = `${tempFile}.thumb.jpg`;
+    if (fs.existsSync(tempThumb)) {
+      return { source: tempThumb };
+    }
+    const tempPreview = `${tempFile}.preview.jpg`;
+    if (fs.existsSync(tempPreview)) {
+      return { source: tempPreview };
+    }
+    const tempArt = `${tempFile}.art.jpg`;
+    if (fs.existsSync(tempArt)) {
+      return { source: tempArt };
     }
 
-    if (cat === "pdf") {
-      try {
-        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
-        if (localPath && fs.existsSync(localPath)) {
-          const previewPath = `${localPath}.preview.jpg`;
-          if (fs.existsSync(previewPath)) {
-            return { source: previewPath };
-          }
-        }
-      } catch {
-        // fallback
-      }
-      return { source: getCardAsset("doc_card.svg") };
+    // 3. If it's a small image already decrypted in temp
+    if (cat === "image" && fs.existsSync(tempFile)) {
+      return { source: tempFile };
     }
 
-    if (cat === "audio") {
-      try {
-        const localPath = getDecryptedAttachmentPath(firstAttachment, vaultKey);
-        if (localPath && fs.existsSync(localPath)) {
-          const artPath = `${localPath}.art.jpg`;
-          if (fs.existsSync(artPath)) {
-            return { source: artPath };
-          }
-        }
-      } catch {
-        // fallback
-      }
-      return { source: getCardAsset("audio_card.svg") };
-    }
-
-    if (cat === "spreadsheet") {
-      return { source: getCardAsset("sheet_card.svg") };
-    }
-
-    if (cat === "code") {
-      return { source: getCardAsset("code_card.svg") };
-    }
-
-    if (cat === "document") {
-      return { source: getCardAsset("doc_card.svg") };
-    }
-
-    if (cat === "archive") {
-      return { source: getCardAsset("archive_card.svg") };
-    }
-
+    // 4. Return modern themed visual cards
+    if (cat === "video") return { source: getCardAsset("video_card.svg") };
+    if (cat === "audio") return { source: getCardAsset("audio_card.svg") };
+    if (cat === "spreadsheet") return { source: getCardAsset("sheet_card.svg") };
+    if (cat === "code") return { source: getCardAsset("code_card.svg") };
+    if (cat === "document") return { source: getCardAsset("doc_card.svg") };
+    if (cat === "archive") return { source: getCardAsset("archive_card.svg") };
+    if (cat === "pdf") return { source: getCardAsset("doc_card.svg") };
     return { source: getCardAsset("doc_card.svg") };
   }
 
@@ -273,10 +239,6 @@ export function getItemGridContent(item: VaultItem, vaultKey: Buffer): Image.Ima
   return { source: getCardAsset("doc_card.svg") };
 }
 
-/**
- * Opens a native Windows Open File dialog so the user can easily select any
- * executable (.exe) from anywhere on their PC without typing or copying paths.
- */
 export async function browseExecutableOnWindows(): Promise<string | null> {
   if (process.platform !== "win32") return null;
 

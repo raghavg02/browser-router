@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { LocalStorage, environment, open } from "@raycast/api";
@@ -19,7 +19,7 @@ const KEY_VAULT_ITEMS = "vault_items";
 
 export const DEFAULT_CATEGORIES = ["Personal", "Work", "Finance", "Development", "Social", "Documents"];
 
-function getVaultFilesDir(): string {
+export function getVaultFilesDir(): string {
   const dir = path.join(environment.supportPath, "vault_files");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -27,7 +27,7 @@ function getVaultFilesDir(): string {
   return dir;
 }
 
-function getTempDecryptedDir(): string {
+export function getTempDecryptedDir(): string {
   const dir = path.join(environment.supportPath, "vault_temp");
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -194,6 +194,26 @@ export function getDecryptedAttachmentPath(attachment: VaultAttachment, key: Buf
   if (!fs.existsSync(encryptedPath)) return null;
 
   try {
+    const stat = fs.statSync(encryptedPath);
+    // If larger than 15 MB, decrypt out-of-process to avoid Raycast's 100 MB JS heap limit
+    if (stat.size > 15 * 1024 * 1024) {
+      const candidates = [
+        path.resolve(__dirname, "../scripts/decryptAttachment.js"),
+        path.resolve(__dirname, "scripts/decryptAttachment.js"),
+        path.resolve("scripts/decryptAttachment.js"),
+      ];
+      const script = candidates.find((p) => fs.existsSync(p));
+      if (script) {
+        const res = spawnSync("node", [script, encryptedPath, tempFile, key.toString("hex")], {
+          windowsHide: true,
+          timeout: 30000,
+        });
+        if (res.status === 0 && fs.existsSync(tempFile)) {
+          return tempFile;
+        }
+      }
+    }
+
     const raw = fs.readFileSync(encryptedPath, "utf8");
     const payload = JSON.parse(raw) as EncryptedPayload;
     const decryptedBuffer = decryptBuffer(payload, key);
