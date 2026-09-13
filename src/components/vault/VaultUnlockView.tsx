@@ -273,9 +273,7 @@ export function VaultUnlockView({ onUnlocked }: VaultUnlockViewProps) {
       />
 
       <Form.Description
-        text={
-          "\n🛡️  Your data stays on this device.\n\n• Press Ctrl + H for password hint  |  Ctrl + Shift + R to reset"
-        }
+        text={"\n🛡️  Your data stays on this device.\n\nTo reset: click Actions below (or press Ctrl + K)"}
       />
     </Form>
   );
