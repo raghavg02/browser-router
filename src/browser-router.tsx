@@ -46,6 +46,27 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
   const [filterText, setFilterText] = useState<string>("");
 
+  // Lock suggestions when user explicitly selects a suggestion with Enter
+  const [isQueryLocked, setIsQueryLocked] = useState<boolean>(false);
+  const [lockedQuery, setLockedQuery] = useState<string>("");
+
+  function handleSelectSuggestion(selectedText: string) {
+    setSearchQuery(selectedText);
+    setLockedQuery(selectedText);
+    setIsQueryLocked(true);
+  }
+
+  function handleSearchTextChange(text: string) {
+    if (mode === "query") {
+      setSearchQuery(text);
+      if (isQueryLocked && text !== lockedQuery) {
+        setIsQueryLocked(false);
+      }
+    } else {
+      setFilterText(text);
+    }
+  }
+
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
   const [history, setHistory] = useState<LaunchHistoryItem[]>([]);
   const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
@@ -107,19 +128,19 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   // Domain autocomplete (e.g. "gith" -> "github.com")
   const domainMatch = useMemo(() => {
-    if (preferences.enableSuggestions === false || mode !== "query") return null;
+    if (preferences.enableSuggestions === false || mode !== "query" || isQueryLocked) return null;
     return getDomainSuggestion(searchQuery);
-  }, [searchQuery, mode, preferences.enableSuggestions]);
+  }, [searchQuery, mode, preferences.enableSuggestions, isQueryLocked]);
 
   // Matching past history items
   const matchingHistory = useMemo(() => {
-    if (preferences.enableSuggestions === false || mode !== "query") return [];
+    if (preferences.enableSuggestions === false || mode !== "query" || isQueryLocked) return [];
     return filterMatchingHistory(history, searchQuery, 2);
-  }, [history, searchQuery, mode, preferences.enableSuggestions]);
+  }, [history, searchQuery, mode, preferences.enableSuggestions, isQueryLocked]);
 
   // Debounced live search suggestions from Google
   useEffect(() => {
-    if (preferences.enableSuggestions === false || mode !== "query") {
+    if (preferences.enableSuggestions === false || mode !== "query" || isQueryLocked) {
       setLiveSuggestions([]);
       return;
     }
@@ -144,7 +165,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [searchQuery, mode, preferences.enableSuggestions]);
+  }, [searchQuery, mode, preferences.enableSuggestions, isQueryLocked]);
 
   async function handleLaunch(
     profile: BrowserProfile,
@@ -257,7 +278,11 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                   title="Clear Search Query"
                   icon={Icon.XMarkCircle}
                   shortcut={{ modifiers: ["ctrl", "shift"], key: "x" }}
-                  onAction={() => setSearchQuery("")}
+                  onAction={() => {
+                    setSearchQuery("");
+                    setIsQueryLocked(false);
+                    setLockedQuery("");
+                  }}
                 />
               ) : null}
               {targetUrl ? (
@@ -370,10 +395,16 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 onAction={() => matchedProfile && handleLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
               />
               <Action
-                title="Fill in Search Bar"
+                title="Use as Search Query"
                 icon={Icon.Pencil}
+                shortcut={Keyboard.Shortcut.Common.Edit}
+                onAction={() => handleSelectSuggestion(item.query)}
+              />
+              <Action
+                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
                 shortcut={{ modifiers: [], key: "tab" }}
-                onAction={() => setSearchQuery(item.query)}
+                onAction={toggleMode}
               />
             </ActionPanel.Section>
 
@@ -408,45 +439,48 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   function renderDomainMatchItem(domain: string) {
     const url = `https://${domain}`;
-    if (!defaultProfile) return null;
     return (
       <List.Item
         key={`domain_${domain}`}
         icon={Icon.Link}
         title={domain}
         subtitle="Direct Domain"
-        accessories={[{ text: "Tab to fill", icon: Icon.ArrowRight }]}
+        accessories={[{ text: "Enter to select", icon: Icon.ArrowRight }]}
         actions={
           <ActionPanel>
             <ActionPanel.Section>
               <Action
-                title={`Open ${domain} in ${defaultProfile.displayName}`}
-                icon={Icon.Globe}
-                onAction={() => handleLaunch(defaultProfile, false, url, domain)}
+                title="Select Suggestion"
+                icon={Icon.ArrowRight}
+                onAction={() => handleSelectSuggestion(domain)}
               />
               <Action
-                title="Open in Incognito / InPrivate"
-                icon={Icon.EyeSlash}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleLaunch(defaultProfile, true, url, domain)}
-              />
-              <Action
-                title="Fill in Search Bar"
-                icon={Icon.Pencil}
+                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
                 shortcut={{ modifiers: [], key: "tab" }}
-                onAction={() => setSearchQuery(url)}
+                onAction={toggleMode}
               />
-            </ActionPanel.Section>
-            <ActionPanel.Section title="Open in Specific Profile">
-              {profiles.map((p) => (
+              {defaultProfile ? (
                 <Action
-                  key={`domain_profile_${p.id}`}
-                  title={`Open in ${p.displayName}`}
-                  icon={getProfileIcon(p)}
-                  onAction={() => handleLaunch(p, false, url, domain)}
+                  title="Open in Incognito / InPrivate"
+                  icon={Icon.EyeSlash}
+                  shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                  onAction={() => handleLaunch(defaultProfile, true, url, domain)}
                 />
-              ))}
+              ) : null}
             </ActionPanel.Section>
+            {defaultProfile ? (
+              <ActionPanel.Section title="Open in Specific Profile">
+                {profiles.map((p) => (
+                  <Action
+                    key={`domain_profile_${p.id}`}
+                    title={`Open in ${p.displayName}`}
+                    icon={getProfileIcon(p)}
+                    onAction={() => handleLaunch(p, false, url, domain)}
+                  />
+                ))}
+              </ActionPanel.Section>
+            ) : null}
           </ActionPanel>
         }
       />
@@ -454,7 +488,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   }
 
   function renderLiveSuggestionItem(suggestion: string) {
-    if (!defaultProfile) return null;
     const url = buildTargetUrl(suggestion, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
     return (
       <List.Item
@@ -462,38 +495,42 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         icon={Icon.MagnifyingGlass}
         title={suggestion}
         subtitle="Search Suggestion"
-        accessories={[{ text: "Tab to fill", icon: Icon.ArrowRight }]}
+        accessories={[{ text: "Enter to select", icon: Icon.ArrowRight }]}
         actions={
           <ActionPanel>
             <ActionPanel.Section>
               <Action
-                title={`Search in ${defaultProfile.displayName}`}
-                icon={Icon.MagnifyingGlass}
-                onAction={() => handleLaunch(defaultProfile, false, url, suggestion)}
+                title="Select Suggestion"
+                icon={Icon.ArrowRight}
+                onAction={() => handleSelectSuggestion(suggestion)}
               />
               <Action
-                title="Search in Incognito / InPrivate"
-                icon={Icon.EyeSlash}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleLaunch(defaultProfile, true, url, suggestion)}
-              />
-              <Action
-                title="Fill in Search Bar"
-                icon={Icon.Pencil}
+                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
                 shortcut={{ modifiers: [], key: "tab" }}
-                onAction={() => setSearchQuery(suggestion)}
+                onAction={toggleMode}
               />
-            </ActionPanel.Section>
-            <ActionPanel.Section title="Search in Specific Profile">
-              {profiles.map((p) => (
+              {defaultProfile ? (
                 <Action
-                  key={`suggest_profile_${p.id}`}
-                  title={`Search in ${p.displayName}`}
-                  icon={getProfileIcon(p)}
-                  onAction={() => handleLaunch(p, false, url, suggestion)}
+                  title="Search in Incognito / InPrivate"
+                  icon={Icon.EyeSlash}
+                  shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                  onAction={() => handleLaunch(defaultProfile, true, url, suggestion)}
                 />
-              ))}
+              ) : null}
             </ActionPanel.Section>
+            {defaultProfile ? (
+              <ActionPanel.Section title="Search in Specific Profile">
+                {profiles.map((p) => (
+                  <Action
+                    key={`suggest_profile_${p.id}`}
+                    title={`Search in ${p.displayName}`}
+                    icon={getProfileIcon(p)}
+                    onAction={() => handleLaunch(p, false, url, suggestion)}
+                  />
+                ))}
+              </ActionPanel.Section>
+            ) : null}
           </ActionPanel>
         }
       />
@@ -508,27 +545,29 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         icon={Icon.Clock}
         title={item.query}
         subtitle="Previous Launch"
-        accessories={[{ text: item.profileDisplayName }, { text: "Tab to fill", icon: Icon.ArrowRight }]}
+        accessories={[{ text: item.profileDisplayName }, { text: "Enter to select", icon: Icon.ArrowRight }]}
         actions={
           <ActionPanel>
             <ActionPanel.Section>
               <Action
-                title={`Re-Open in ${matchedProfile ? matchedProfile.displayName : item.profileDisplayName}`}
+                title="Select Suggestion"
                 icon={Icon.ArrowRight}
-                onAction={() => matchedProfile && handleLaunch(matchedProfile, false, item.resolvedUrl, item.query)}
+                onAction={() => handleSelectSuggestion(item.query)}
               />
               <Action
-                title="Open in Incognito / InPrivate"
-                icon={Icon.EyeSlash}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => matchedProfile && handleLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
-              />
-              <Action
-                title="Fill in Search Bar"
-                icon={Icon.Pencil}
+                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
                 shortcut={{ modifiers: [], key: "tab" }}
-                onAction={() => setSearchQuery(item.query)}
+                onAction={toggleMode}
               />
+              {matchedProfile ? (
+                <Action
+                  title="Open in Incognito / InPrivate"
+                  icon={Icon.EyeSlash}
+                  shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                  onAction={() => handleLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
+                />
+              ) : null}
             </ActionPanel.Section>
             <ActionPanel.Section title="History Management">
               <Action
@@ -571,6 +610,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   const hasSuggestions =
     preferences.enableSuggestions !== false &&
+    !isQueryLocked &&
     mode === "query" &&
     searchQuery.trim().length >= 2 &&
     (!!domainMatch || matchingHistory.length > 0 || liveSuggestions.length > 0);
@@ -584,7 +624,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       searchBarPlaceholder={placeholderText}
       filtering={false}
       searchText={mode === "query" ? searchQuery : filterText}
-      onSearchTextChange={mode === "query" ? setSearchQuery : setFilterText}
+      onSearchTextChange={handleSearchTextChange}
       searchBarAccessory={
         <List.Dropdown tooltip="Mode" value={mode} onChange={(val) => setMode(val as "query" | "filter")}>
           <List.Dropdown.Item value="query" title="Search" icon={Icon.MagnifyingGlass} />
