@@ -49,12 +49,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   // Lock suggestions when user explicitly selects a suggestion with Enter
   const [isQueryLocked, setIsQueryLocked] = useState<boolean>(false);
   const [lockedQuery, setLockedQuery] = useState<string>("");
-
-  function handleSelectSuggestion(selectedText: string) {
-    setSearchQuery(selectedText);
-    setLockedQuery(selectedText);
-    setIsQueryLocked(true);
-  }
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
 
   function handleSearchTextChange(text: string) {
     if (mode === "query") {
@@ -62,8 +57,10 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       if (isQueryLocked && text !== lockedQuery) {
         setIsQueryLocked(false);
       }
+      setSelectedItemId(undefined);
     } else {
       setFilterText(text);
+      setSelectedItemId(undefined);
     }
   }
 
@@ -222,6 +219,19 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const favorites = useMemo(() => displayedProfiles.filter((p) => p.isFavorite), [displayedProfiles]);
   const allOther = useMemo(() => displayedProfiles.filter((p) => !p.isFavorite), [displayedProfiles]);
 
+  const firstProfileId = useMemo(() => {
+    return favorites[0]?.id || allOther[0]?.id || profiles[0]?.id;
+  }, [favorites, allOther, profiles]);
+
+  function handleSelectSuggestion(selectedText: string) {
+    setSearchQuery(selectedText);
+    setLockedQuery(selectedText);
+    setIsQueryLocked(true);
+    if (firstProfileId) {
+      setSelectedItemId(firstProfileId);
+    }
+  }
+
   function getProfileIcon(profile: BrowserProfile): Image.ImageLike {
     if (profile.avatarPath) {
       return { source: profile.avatarPath };
@@ -234,6 +244,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   function toggleMode() {
     setMode((prev) => (prev === "query" ? "filter" : "query"));
+    setSelectedItemId(undefined);
   }
 
   function renderProfileItem(profile: BrowserProfile) {
@@ -247,6 +258,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return (
       <List.Item
         key={profile.id}
+        id={profile.id}
         icon={icon}
         title={profile.displayName}
         accessories={accessories}
@@ -282,6 +294,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                     setSearchQuery("");
                     setIsQueryLocked(false);
                     setLockedQuery("");
+                    setSelectedItemId(undefined);
                   }}
                 />
               ) : null}
@@ -373,6 +386,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return (
       <List.Item
         key={`recent_${item.id}`}
+        id={`recent_${item.id}`}
         icon={Icon.Clock}
         title={item.query}
         subtitle={item.resolvedUrl}
@@ -442,6 +456,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return (
       <List.Item
         key={`domain_${domain}`}
+        id={`domain_${domain}`}
         icon={Icon.Link}
         title={domain}
         subtitle="Direct Domain"
@@ -492,6 +507,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return (
       <List.Item
         key={`suggest_${suggestion}`}
+        id={`suggest_${suggestion}`}
         icon={Icon.MagnifyingGlass}
         title={suggestion}
         subtitle="Search Suggestion"
@@ -542,6 +558,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return (
       <List.Item
         key={`match_hist_${item.id}`}
+        id={`match_hist_${item.id}`}
         icon={Icon.Clock}
         title={item.query}
         subtitle="Previous Launch"
@@ -625,6 +642,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       filtering={false}
       searchText={mode === "query" ? searchQuery : filterText}
       onSearchTextChange={handleSearchTextChange}
+      selectedItemId={selectedItemId}
+      onSelectionChange={(id) => setSelectedItemId(id ?? undefined)}
       searchBarAccessory={
         <List.Dropdown tooltip="Mode" value={mode} onChange={(val) => setMode(val as "query" | "filter")}>
           <List.Dropdown.Item value="query" title="Search" icon={Icon.MagnifyingGlass} />
