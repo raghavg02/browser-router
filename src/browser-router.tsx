@@ -24,9 +24,17 @@ import { VaultUnlockView } from "./components/vault/VaultUnlockView";
 import { VaultMainView } from "./components/vault/VaultMainView";
 import { FeedbackForm } from "./components/FeedbackForm";
 import { UserManualView } from "./components/UserManualView";
+import {
+  LaunchHistoryItem,
+  getLaunchHistory,
+  recordLaunch,
+  deleteHistoryItem,
+  clearAllHistory,
+} from "./utils/historyStorage";
+import { getDomainSuggestion, fetchLiveSearchSuggestions, filterMatchingHistory } from "./utils/suggestionService";
 
 export default function Command(props: LaunchProps<{ arguments: { query?: string }; fallbackText?: string }>) {
-  const preferences = getPreferenceValues<Preferences>();
+  const preferences = getPreferenceValues<Preferences & { enableSuggestions?: boolean }>();
 
   // Determine if query came from Raycast argument or fallback text
   const initialQuery = (props.arguments?.query || props.fallbackText || "").trim();
@@ -39,6 +47,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   const [filterText, setFilterText] = useState<string>("");
 
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
+  const [history, setHistory] = useState<LaunchHistoryItem[]>([]);
+  const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     async function checkFirstRun() {
@@ -46,6 +56,14 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       setHasSeenManual(!!seen);
     }
     checkFirstRun();
+  }, []);
+
+  useEffect(() => {
+    async function loadHistory() {
+      const saved = await getLaunchHistory();
+      setHistory(saved);
+    }
+    loadHistory();
   }, []);
 
   async function handleDismissFirstRun() {
@@ -82,8 +100,68 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return buildTargetUrl(searchQuery, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
   }, [searchQuery, preferences.defaultSearchEngine, preferences.customSearchUrl]);
 
-  async function handleLaunch(profile: BrowserProfile, incognito = false) {
-    await launchBrowserProfile(profile, targetUrl || undefined, incognito);
+  // Default / favorite profile used as primary target for suggestions
+  const defaultProfile = useMemo(() => {
+    return profiles.find((p) => p.isFavorite) || profiles[0];
+  }, [profiles]);
+
+  // Domain autocomplete (e.g. "gith" -> "github.com")
+  const domainMatch = useMemo(() => {
+    if (preferences.enableSuggestions === false || mode !== "query") return null;
+    return getDomainSuggestion(searchQuery);
+  }, [searchQuery, mode, preferences.enableSuggestions]);
+
+  // Matching past history items
+  const matchingHistory = useMemo(() => {
+    if (preferences.enableSuggestions === false || mode !== "query") return [];
+    return filterMatchingHistory(history, searchQuery, 2);
+  }, [history, searchQuery, mode, preferences.enableSuggestions]);
+
+  // Debounced live search suggestions from Google
+  useEffect(() => {
+    if (preferences.enableSuggestions === false || mode !== "query") {
+      setLiveSuggestions([]);
+      return;
+    }
+
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setLiveSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await fetchLiveSearchSuggestions(trimmed, controller.signal);
+        setLiveSuggestions(results);
+      } catch {
+        setLiveSuggestions([]);
+      }
+    }, 180);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [searchQuery, mode, preferences.enableSuggestions]);
+
+  async function handleLaunch(
+    profile: BrowserProfile,
+    incognito = false,
+    overrideUrl?: string,
+    overrideQuery?: string,
+  ) {
+    const urlToOpen = overrideUrl || targetUrl;
+    const queryUsed = overrideQuery || searchQuery;
+    await launchBrowserProfile(profile, urlToOpen || undefined, incognito);
+
+    // STRICT PRIVACY GUARANTEE: Never record launches in incognito mode
+    if (!incognito && queryUsed.trim()) {
+      await recordLaunch(queryUsed, urlToOpen, profile, false);
+      const updatedHistory = await getLaunchHistory();
+      setHistory(updatedHistory);
+    }
   }
 
   async function handleToggleFavorite(profileId: string) {
@@ -265,8 +343,213 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     );
   }
 
-  const placeholderText = mode === "query" ? "Search query or URL..." : "Filter profiles...";
+  function renderRecentHistoryItem(item: LaunchHistoryItem) {
+    const matchedProfile = profiles.find((p) => p.id === item.profileId) || defaultProfile;
+    return (
+      <List.Item
+        key={`recent_${item.id}`}
+        icon={Icon.Clock}
+        title={item.query}
+        subtitle={item.resolvedUrl}
+        accessories={[
+          { text: item.profileDisplayName, icon: Icon.Globe },
+          { date: new Date(item.timestamp), tooltip: `Last opened: ${new Date(item.timestamp).toLocaleString()}` },
+        ]}
+        actions={
+          <ActionPanel>
+            <ActionPanel.Section>
+              <Action
+                title={`Re-Open in ${matchedProfile ? matchedProfile.displayName : item.profileDisplayName}`}
+                icon={Icon.ArrowRight}
+                onAction={() => matchedProfile && handleLaunch(matchedProfile, false, item.resolvedUrl, item.query)}
+              />
+              <Action
+                title="Open in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => matchedProfile && handleLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
+              />
+              <Action
+                title="Fill in Search Bar"
+                icon={Icon.Pencil}
+                shortcut={{ modifiers: [], key: "tab" }}
+                onAction={() => setSearchQuery(item.query)}
+              />
+            </ActionPanel.Section>
 
+            <ActionPanel.Section title="History Management">
+              <Action
+                title="Remove from History"
+                icon={Icon.Trash}
+                style={Action.Style.Destructive}
+                shortcut={{ modifiers: ["ctrl"], key: "backspace" }}
+                onAction={async () => {
+                  const updated = await deleteHistoryItem(item.id);
+                  setHistory(updated);
+                  await showToast({ style: Toast.Style.Success, title: "Removed from History" });
+                }}
+              />
+              <Action
+                title="Clear All History"
+                icon={Icon.Trash}
+                style={Action.Style.Destructive}
+                onAction={async () => {
+                  await clearAllHistory();
+                  setHistory([]);
+                  await showToast({ style: Toast.Style.Success, title: "History Cleared" });
+                }}
+              />
+            </ActionPanel.Section>
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  function renderDomainMatchItem(domain: string) {
+    const url = `https://${domain}`;
+    if (!defaultProfile) return null;
+    return (
+      <List.Item
+        key={`domain_${domain}`}
+        icon={Icon.Link}
+        title={domain}
+        subtitle="Direct Domain"
+        accessories={[{ text: "Tab to fill", icon: Icon.ArrowRight }]}
+        actions={
+          <ActionPanel>
+            <ActionPanel.Section>
+              <Action
+                title={`Open ${domain} in ${defaultProfile.displayName}`}
+                icon={Icon.Globe}
+                onAction={() => handleLaunch(defaultProfile, false, url, domain)}
+              />
+              <Action
+                title="Open in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => handleLaunch(defaultProfile, true, url, domain)}
+              />
+              <Action
+                title="Fill in Search Bar"
+                icon={Icon.Pencil}
+                shortcut={{ modifiers: [], key: "tab" }}
+                onAction={() => setSearchQuery(url)}
+              />
+            </ActionPanel.Section>
+            <ActionPanel.Section title="Open in Specific Profile">
+              {profiles.map((p) => (
+                <Action
+                  key={`domain_profile_${p.id}`}
+                  title={`Open in ${p.displayName}`}
+                  icon={getProfileIcon(p)}
+                  onAction={() => handleLaunch(p, false, url, domain)}
+                />
+              ))}
+            </ActionPanel.Section>
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  function renderLiveSuggestionItem(suggestion: string) {
+    if (!defaultProfile) return null;
+    const url = buildTargetUrl(suggestion, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
+    return (
+      <List.Item
+        key={`suggest_${suggestion}`}
+        icon={Icon.MagnifyingGlass}
+        title={suggestion}
+        subtitle="Search Suggestion"
+        accessories={[{ text: "Tab to fill", icon: Icon.ArrowRight }]}
+        actions={
+          <ActionPanel>
+            <ActionPanel.Section>
+              <Action
+                title={`Search in ${defaultProfile.displayName}`}
+                icon={Icon.MagnifyingGlass}
+                onAction={() => handleLaunch(defaultProfile, false, url, suggestion)}
+              />
+              <Action
+                title="Search in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => handleLaunch(defaultProfile, true, url, suggestion)}
+              />
+              <Action
+                title="Fill in Search Bar"
+                icon={Icon.Pencil}
+                shortcut={{ modifiers: [], key: "tab" }}
+                onAction={() => setSearchQuery(suggestion)}
+              />
+            </ActionPanel.Section>
+            <ActionPanel.Section title="Search in Specific Profile">
+              {profiles.map((p) => (
+                <Action
+                  key={`suggest_profile_${p.id}`}
+                  title={`Search in ${p.displayName}`}
+                  icon={getProfileIcon(p)}
+                  onAction={() => handleLaunch(p, false, url, suggestion)}
+                />
+              ))}
+            </ActionPanel.Section>
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  function renderMatchingHistoryItem(item: LaunchHistoryItem) {
+    const matchedProfile = profiles.find((p) => p.id === item.profileId) || defaultProfile;
+    return (
+      <List.Item
+        key={`match_hist_${item.id}`}
+        icon={Icon.Clock}
+        title={item.query}
+        subtitle="Previous Launch"
+        accessories={[{ text: item.profileDisplayName }, { text: "Tab to fill", icon: Icon.ArrowRight }]}
+        actions={
+          <ActionPanel>
+            <ActionPanel.Section>
+              <Action
+                title={`Re-Open in ${matchedProfile ? matchedProfile.displayName : item.profileDisplayName}`}
+                icon={Icon.ArrowRight}
+                onAction={() => matchedProfile && handleLaunch(matchedProfile, false, item.resolvedUrl, item.query)}
+              />
+              <Action
+                title="Open in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
+                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                onAction={() => matchedProfile && handleLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
+              />
+              <Action
+                title="Fill in Search Bar"
+                icon={Icon.Pencil}
+                shortcut={{ modifiers: [], key: "tab" }}
+                onAction={() => setSearchQuery(item.query)}
+              />
+            </ActionPanel.Section>
+            <ActionPanel.Section title="History Management">
+              <Action
+                title="Remove from History"
+                icon={Icon.Trash}
+                style={Action.Style.Destructive}
+                shortcut={{ modifiers: ["ctrl"], key: "backspace" }}
+                onAction={async () => {
+                  const updated = await deleteHistoryItem(item.id);
+                  setHistory(updated);
+                  await showToast({ style: Toast.Style.Success, title: "Removed from History" });
+                }}
+              />
+            </ActionPanel.Section>
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  // Section title for non-favorite profiles
   const sectionTitle =
     mode === "query"
       ? targetUrl
@@ -276,9 +559,24 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         ? `Routing query: "${searchQuery}"`
         : "Filter Profiles";
 
+  // Dynamic placeholder text
+  const placeholderText =
+    mode === "query"
+      ? "Search query or URL... (Press Tab to filter profiles)"
+      : "Filter browser profiles by name... (Press Tab for search mode)";
+
   if (hasSeenManual === false) {
     return <UserManualView isFirstRun={true} onDismissFirstRun={handleDismissFirstRun} />;
   }
+
+  const hasSuggestions =
+    preferences.enableSuggestions !== false &&
+    mode === "query" &&
+    searchQuery.trim().length >= 2 &&
+    (!!domainMatch || matchingHistory.length > 0 || liveSuggestions.length > 0);
+
+  const hasRecents =
+    preferences.enableSuggestions !== false && mode === "query" && !searchQuery.trim() && history.length > 0;
 
   return (
     <List
@@ -326,8 +624,24 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         }
       />
 
+      {/* SUGGESTIONS & AUTOCOMPLETE (Only when typing in query mode) */}
+      {hasSuggestions ? (
+        <List.Section title="Suggestions & Autocomplete">
+          {domainMatch ? renderDomainMatchItem(domainMatch) : null}
+          {matchingHistory.map(renderMatchingHistoryItem)}
+          {liveSuggestions.map(renderLiveSuggestionItem)}
+        </List.Section>
+      ) : null}
+
+      {/* RECENT LAUNCHES (When search bar is empty) */}
+      {hasRecents ? (
+        <List.Section title="Recent Launches">{history.slice(0, 4).map(renderRecentHistoryItem)}</List.Section>
+      ) : null}
+
+      {/* FAVORITES (Always clean & primary) */}
       {favorites.length > 0 ? <List.Section title="Favorites">{favorites.map(renderProfileItem)}</List.Section> : null}
 
+      {/* ALL OTHER PROFILES */}
       <List.Section title={sectionTitle}>{allOther.map(renderProfileItem)}</List.Section>
     </List>
   );

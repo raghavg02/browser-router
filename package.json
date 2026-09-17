@@ -82,6 +82,15 @@
       "type": "textfield",
       "required": false,
       "placeholder": "https://kagi.com/search?q=%s"
+    },
+    {
+      "name": "enableSuggestions",
+      "title": "Search Suggestions & Recents",
+      "label": "Show search suggestions and recents",
+      "description": "Show live query suggestions, domain completion, and recent launch history above the browser list",
+      "type": "checkbox",
+      "required": false,
+      "default": true
     }
   ],
   "dependencies": {
