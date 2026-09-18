@@ -1078,9 +1078,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
           <List.Item
             id="getting_started_pro_tip"
             icon={Icon.LightBulb}
-            title="Pro Tip: Press Shift + Enter on any suggestion to Quick-Launch"
-            subtitle="Highlight any profile below and press Ctrl + Shift + P to set your preferred profile"
-            accessories={[{ text: "Tip", icon: Icon.Stars }]}
+            title="Quick-Launch with Shift + Enter"
+            subtitle="Set preferred profile below with Ctrl + Shift + P"
             actions={
               <ActionPanel>
                 {firstProfileId ? (
