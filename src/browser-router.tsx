@@ -50,7 +50,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   // Lock suggestions when user explicitly selects a suggestion with Enter
   const [isQueryLocked, setIsQueryLocked] = useState<boolean>(false);
-  const [lockedQuery, setLockedQuery] = useState<string>("");
   const [selectedItemId, setSelectedItemId] = useState<string | undefined>(undefined);
 
   // Incognito intent: true when user selects suggestion with Ctrl + Enter
@@ -60,7 +59,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   function handleSearchTextChange(text: string) {
     if (mode === "query") {
       setSearchQuery(text);
-      if (isQueryLocked && text !== lockedQuery) {
+      if (isQueryLocked) {
         setIsQueryLocked(false);
         setIsIncognitoIntent(false);
       }
@@ -275,7 +274,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   function handleSelectSuggestion(selectedText: string, incognito = false) {
     setSearchQuery(selectedText);
-    setLockedQuery(selectedText);
     setIsQueryLocked(true);
     setIsIncognitoIntent(incognito);
     if (firstProfileId) {
@@ -325,11 +323,19 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 onAction={() => handleLaunch(profile, isIncognitoIntent)}
               />
               <Action
-                title={isIncognitoIntent ? `Open in ${profile.displayName} (Normal)` : "Open in Incognito / InPrivate"}
-                icon={isIncognitoIntent ? Icon.Globe : Icon.EyeSlash}
+                title="Open in Incognito / InPrivate"
+                icon={Icon.EyeSlash}
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleLaunch(profile, !isIncognitoIntent)}
+                onAction={() => handleLaunch(profile, true)}
               />
+              {isIncognitoIntent ? (
+                <Action
+                  title={`Open in ${profile.displayName} (Normal Window)`}
+                  icon={Icon.Globe}
+                  shortcut={{ modifiers: ["shift"], key: "enter" }}
+                  onAction={() => handleLaunch(profile, false)}
+                />
+              ) : null}
             </ActionPanel.Section>
 
             <ActionPanel.Section title="Search & Filter Mode">
@@ -339,6 +345,14 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 shortcut={{ modifiers: [], key: "tab" }}
                 onAction={toggleMode}
               />
+              {isIncognitoIntent ? (
+                <Action
+                  title="Cancel Incognito Mode"
+                  icon={Icon.Eye}
+                  shortcut={{ modifiers: ["ctrl", "shift"], key: "i" }}
+                  onAction={() => setIsIncognitoIntent(false)}
+                />
+              ) : null}
               {searchQuery ? (
                 <Action
                   title="Clear Search Query"
@@ -347,7 +361,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                   onAction={() => {
                     setSearchQuery("");
                     setIsQueryLocked(false);
-                    setLockedQuery("");
                     setIsIncognitoIntent(false);
                     setSelectedItemId(undefined);
                   }}
@@ -460,6 +473,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         title={item.query}
         subtitle={item.resolvedUrl}
         accessories={[
+          { text: "Enter to use query", icon: Icon.Pencil },
           { text: item.profileDisplayName, icon: Icon.Globe },
           { date: new Date(item.timestamp), tooltip: `Last opened: ${new Date(item.timestamp).toLocaleString()}` },
         ]}
@@ -565,13 +579,28 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
                 onAction={() => handleSelectSuggestion(domain, true)}
               />
-              {preferredProfile && preferences.quickLaunchShortcutEnabled !== false ? (
-                <Action
-                  title={`Quick-Launch in ${preferredProfile.displayName}`}
-                  icon={Icon.Bolt}
-                  shortcut={{ modifiers: ["shift"], key: "enter" }}
-                  onAction={() => handleLaunch(preferredProfile, false, url, domain)}
-                />
+              {preferences.quickLaunchShortcutEnabled !== false ? (
+                preferredProfile ? (
+                  <Action
+                    title={`Quick-Launch in ${preferredProfile.displayName}`}
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={() => handleLaunch(preferredProfile, false, url, domain)}
+                  />
+                ) : (
+                  <Action
+                    title="Quick-Launch (Set Preferred Profile First…)"
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={async () => {
+                      await showToast({
+                        style: Toast.Style.Failure,
+                        title: "No Preferred Profile Set",
+                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
+                      });
+                    }}
+                  />
+                )
               ) : null}
             </ActionPanel.Section>
 
@@ -643,13 +672,28 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
                 onAction={() => handleSelectSuggestion(suggestion, true)}
               />
-              {preferredProfile && preferences.quickLaunchShortcutEnabled !== false ? (
-                <Action
-                  title={`Quick-Launch in ${preferredProfile.displayName}`}
-                  icon={Icon.Bolt}
-                  shortcut={{ modifiers: ["shift"], key: "enter" }}
-                  onAction={() => handleLaunch(preferredProfile, false, url, suggestion)}
-                />
+              {preferences.quickLaunchShortcutEnabled !== false ? (
+                preferredProfile ? (
+                  <Action
+                    title={`Quick-Launch in ${preferredProfile.displayName}`}
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={() => handleLaunch(preferredProfile, false, url, suggestion)}
+                  />
+                ) : (
+                  <Action
+                    title="Quick-Launch (Set Preferred Profile First…)"
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={async () => {
+                      await showToast({
+                        style: Toast.Style.Failure,
+                        title: "No Preferred Profile Set",
+                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
+                      });
+                    }}
+                  />
+                )
               ) : null}
             </ActionPanel.Section>
 
@@ -720,13 +764,28 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
                 onAction={() => handleSelectSuggestion(item.query, true)}
               />
-              {preferredProfile && preferences.quickLaunchShortcutEnabled !== false ? (
-                <Action
-                  title={`Quick-Launch in ${preferredProfile.displayName}`}
-                  icon={Icon.Bolt}
-                  shortcut={{ modifiers: ["shift"], key: "enter" }}
-                  onAction={() => handleLaunch(preferredProfile, false, item.resolvedUrl, item.query)}
-                />
+              {preferences.quickLaunchShortcutEnabled !== false ? (
+                preferredProfile ? (
+                  <Action
+                    title={`Quick-Launch in ${preferredProfile.displayName}`}
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={() => handleLaunch(preferredProfile, false, item.resolvedUrl, item.query)}
+                  />
+                ) : (
+                  <Action
+                    title="Quick-Launch (Set Preferred Profile First…)"
+                    icon={Icon.Bolt}
+                    shortcut={{ modifiers: ["shift"], key: "enter" }}
+                    onAction={async () => {
+                      await showToast({
+                        style: Toast.Style.Failure,
+                        title: "No Preferred Profile Set",
+                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
+                      });
+                    }}
+                  />
+                )
               ) : null}
             </ActionPanel.Section>
 
@@ -818,12 +877,6 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       onSearchTextChange={handleSearchTextChange}
       selectedItemId={selectedItemId}
       onSelectionChange={(id) => setSelectedItemId(id ?? undefined)}
-      searchBarAccessory={
-        <List.Dropdown tooltip="Mode" value={mode} onChange={(val) => setMode(val as "query" | "filter")}>
-          <List.Dropdown.Item value="query" title="Search" icon={Icon.MagnifyingGlass} />
-          <List.Dropdown.Item value="filter" title="Filter" icon={Icon.Filter} />
-        </List.Dropdown>
-      }
     >
       <List.EmptyView
         icon={Icon.MagnifyingGlass}
@@ -892,6 +945,14 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                       />
                     }
                   />
+                  <ActionPanel.Section title="Search & Filter Mode">
+                    <Action
+                      title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                      icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
+                      shortcut={{ modifiers: [], key: "tab" }}
+                      onAction={toggleMode}
+                    />
+                  </ActionPanel.Section>
                   <ActionPanel.Section title="History Management">
                     <Action
                       title="Clear All History"

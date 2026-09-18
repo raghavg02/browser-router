@@ -105,7 +105,10 @@ export function LaunchHistoryView({
                         title="Open in Incognito / InPrivate"
                         icon={Icon.EyeSlash}
                         shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                        onAction={() => onLaunch(matchedProfile, true, item.resolvedUrl, item.query)}
+                        onAction={async () => {
+                          pop();
+                          await onLaunch(matchedProfile, true, item.resolvedUrl, item.query);
+                        }}
                       />
                     ) : null}
                     {matchedProfile ? (
@@ -113,7 +116,10 @@ export function LaunchHistoryView({
                         title={`Re-Open in ${matchedProfile.displayName}`}
                         icon={Icon.ArrowRight}
                         shortcut={{ modifiers: ["shift"], key: "enter" }}
-                        onAction={() => onLaunch(matchedProfile, false, item.resolvedUrl, item.query)}
+                        onAction={async () => {
+                          pop();
+                          await onLaunch(matchedProfile, false, item.resolvedUrl, item.query);
+                        }}
                       />
                     ) : null}
                   </ActionPanel.Section>
@@ -123,7 +129,10 @@ export function LaunchHistoryView({
                       <Action
                         key={`hist_profile_${p.id}`}
                         title={`Open in ${p.displayName}`}
-                        onAction={() => onLaunch(p, false, item.resolvedUrl, item.query)}
+                        onAction={async () => {
+                          pop();
+                          await onLaunch(p, false, item.resolvedUrl, item.query);
+                        }}
                       />
                     ))}
                   </ActionPanel.Section>

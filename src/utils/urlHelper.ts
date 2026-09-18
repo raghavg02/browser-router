@@ -36,6 +36,86 @@ export function isLikelyUrl(input: string): boolean {
   if (!/\s/.test(trimmed)) {
     const domainPattern = /^[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)*\.[a-zA-Z]{2,}(:\d+)?(\/.*)?$/;
     if (domainPattern.test(trimmed)) {
+      // Check for common file/programming language extensions (e.g. node.js, react.js, notes.md, test.py)
+      // If it doesn't contain a path slash or port, treat it as a search query rather than a website.
+      if (!trimmed.includes("/") && !trimmed.includes(":") && !trimmed.includes("?")) {
+        const lastDot = trimmed.lastIndexOf(".");
+        if (lastDot !== -1) {
+          const ext = trimmed.slice(lastDot + 1).toLowerCase();
+          const codeAndFileExtensions = new Set([
+            "js",
+            "ts",
+            "jsx",
+            "tsx",
+            "py",
+            "java",
+            "cpp",
+            "c",
+            "cs",
+            "rb",
+            "go",
+            "php",
+            "html",
+            "htm",
+            "css",
+            "scss",
+            "sass",
+            "less",
+            "json",
+            "xml",
+            "yaml",
+            "yml",
+            "toml",
+            "ini",
+            "env",
+            "md",
+            "txt",
+            "rtf",
+            "pdf",
+            "doc",
+            "docx",
+            "xls",
+            "xlsx",
+            "ppt",
+            "pptx",
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "svg",
+            "webp",
+            "ico",
+            "zip",
+            "tar",
+            "gz",
+            "rar",
+            "7z",
+            "bz2",
+            "exe",
+            "msi",
+            "bat",
+            "cmd",
+            "ps1",
+            "sh",
+            "dll",
+            "bin",
+            "mp3",
+            "wav",
+            "mp4",
+            "mkv",
+            "avi",
+            "mov",
+            "sql",
+            "db",
+            "sqlite",
+            "log",
+            "lock",
+          ]);
+          if (codeAndFileExtensions.has(ext)) {
+            return false;
+          }
+        }
+      }
       return true;
     }
   }
