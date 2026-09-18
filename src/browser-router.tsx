@@ -583,7 +583,12 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
           icon={Icon.Calculator}
           title={item.title || `= ${item.text}`}
           subtitle="Calculator"
-          accessories={[{ text: "Copy Result", icon: Icon.Clipboard }]}
+          accessories={[
+            { text: "Copy Result", icon: Icon.Clipboard },
+            ...(preferredProfile && preferences.quickLaunchShortcutEnabled !== false
+              ? [{ text: `Shift+↵ for ${preferredProfile.displayName}`, icon: Icon.Bolt }]
+              : []),
+          ]}
           actions={
             <ActionPanel>
               <ActionPanel.Section>
@@ -665,7 +670,12 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
           icon={Icon.Globe}
           title={item.text}
           subtitle={item.title}
-          accessories={[{ text: "Website", icon: Icon.Link }]}
+          accessories={[
+            { text: "Website", icon: Icon.Link },
+            ...(preferredProfile && preferences.quickLaunchShortcutEnabled !== false
+              ? [{ text: `Shift+↵ for ${preferredProfile.displayName}`, icon: Icon.Bolt }]
+              : []),
+          ]}
           actions={
             <ActionPanel>
               <ActionPanel.Section>
@@ -755,6 +765,11 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
         id={item.id}
         icon={Icon.MagnifyingGlass}
         title={item.text}
+        accessories={
+          preferredProfile && preferences.quickLaunchShortcutEnabled !== false
+            ? [{ text: `Shift+↵ for ${preferredProfile.displayName}`, icon: Icon.Bolt }]
+            : []
+        }
         actions={
           <ActionPanel>
             <ActionPanel.Section>
@@ -935,7 +950,9 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     mode === "query"
       ? isIncognitoIntent
         ? "Incognito Mode: Select profile to launch in Incognito..."
-        : "Search query or URL... (Press Tab to filter profiles)"
+        : history.length === 0
+          ? "Type a search, URL, or math (e.g. 5*25)... (Press Tab to filter profiles)"
+          : "Search query or URL... (Press Tab to filter profiles)"
       : "Filter browser profiles by name... (Press Tab for search mode)";
 
   if (hasSeenManual === false) {
@@ -1052,6 +1069,43 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               }
             />
           ) : null}
+        </List.Section>
+      ) : null}
+
+      {/* GETTING STARTED PRO-TIP (Only on Day-1 when history is empty and search bar is clear) */}
+      {history.length === 0 && !searchQuery.trim() && preferences.enableHistory !== false ? (
+        <List.Section title="Getting Started">
+          <List.Item
+            id="getting_started_pro_tip"
+            icon={Icon.LightBulb}
+            title="Pro Tip: Press Shift + Enter on any suggestion to Quick-Launch"
+            subtitle="Highlight any profile below and press Ctrl + Shift + P to set your preferred profile"
+            accessories={[{ text: "Tip", icon: Icon.Stars }]}
+            actions={
+              <ActionPanel>
+                {firstProfileId ? (
+                  <Action
+                    title="Focus Profiles to Set Quick-Launch"
+                    icon={Icon.Bolt}
+                    onAction={() => setSelectedItemId(firstProfileId)}
+                  />
+                ) : null}
+                <Action.Push
+                  title="Open Quick Guide & Manual"
+                  icon={Icon.Book}
+                  target={<UserManualView isFirstRun={false} onDismissFirstRun={() => {}} />}
+                />
+                <ActionPanel.Section title="Search & Filter Mode">
+                  <Action
+                    title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                    icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
+                    shortcut={{ modifiers: [], key: "tab" }}
+                    onAction={toggleMode}
+                  />
+                </ActionPanel.Section>
+              </ActionPanel>
+            }
+          />
         </List.Section>
       ) : null}
 

@@ -79,8 +79,8 @@
     {
       "name": "enableLiveSuggestions",
       "title": "Live Suggestions",
-      "label": "Enable live search suggestions and domain autocomplete",
-      "description": "Show live search suggestions and popular domain autocompletion while typing",
+      "label": "Show real-time Google search suggestions and website links",
+      "description": "Fetches instant query completions, direct website links, and math calculation results as you type",
       "type": "checkbox",
       "required": false,
       "default": true
@@ -122,8 +122,8 @@
     {
       "name": "enableHistory",
       "title": "Previous Search History",
-      "label": "Enable previous search history and recent launches",
-      "description": "Show previous search history when the search bar is empty and recall matching queries while typing",
+      "label": "Remember recent launches and suggest past queries",
+      "description": "Saves up to 200 launches locally for instant recall. Incognito launches are never recorded.",
       "type": "checkbox",
       "required": false,
       "default": true
@@ -132,7 +132,7 @@
       "name": "quickLaunchShortcutEnabled",
       "title": "Preferred Profile Quick-Launch",
       "label": "Enable Quick-Launch shortcut on suggestions",
-      "description": "Allows pressing Shift + Enter on any suggestion to immediately launch in your designated preferred profile",
+      "description": "Enables Shift + Enter on suggestions to immediately launch in your designated profile. (To set or change profile, highlight it and press Ctrl + Shift + P).",
       "type": "checkbox",
       "required": false,
       "default": true
