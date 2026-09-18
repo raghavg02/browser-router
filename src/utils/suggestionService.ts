@@ -1,80 +1,69 @@
 import { LaunchHistoryItem } from "./historyStorage";
 
-// Common popular domains dictionary for instant completion
-const POPULAR_DOMAINS: Record<string, string> = {
-  git: "github.com",
-  github: "github.com",
-  figma: "figma.com",
-  fig: "figma.com",
-  yt: "youtube.com",
-  youtube: "youtube.com",
-  reddit: "reddit.com",
-  red: "reddit.com",
-  notion: "notion.so",
-  linear: "linear.app",
-  gpt: "chatgpt.com",
-  chatgpt: "chatgpt.com",
-  claude: "claude.ai",
-  x: "x.com",
-  twitter: "x.com",
-  linkedin: "linkedin.com",
-  so: "stackoverflow.com",
-  stackoverflow: "stackoverflow.com",
-  netflix: "netflix.com",
-  amazon: "amazon.com",
-  amzn: "amazon.com",
-  wiki: "wikipedia.org",
-  wikipedia: "wikipedia.org",
-  gmail: "mail.google.com",
-  docs: "docs.google.com",
-  drive: "drive.google.com",
-  vercel: "vercel.com",
-  twitch: "twitch.tv",
-  spotify: "open.spotify.com",
-};
+export type GoogleSuggestionType = "QUERY" | "NAVIGATION" | "CALCULATOR";
+
+export interface GoogleSuggestion {
+  id: string;
+  text: string;
+  type: GoogleSuggestionType;
+  url?: string;
+  title?: string;
+  relevance: number;
+}
+
+interface CacheEntry {
+  suggestions: GoogleSuggestion[];
+  timestamp: number;
+}
+
+const suggestionCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
+const MAX_CACHE_ENTRIES = 150;
 
 /**
- * Checks if a typed keyword matches a popular website domain.
+ * Parses and cleans a URL into a compact, human-readable display string (e.g. "https://www.figma.com/" -> "figma.com")
  */
-export function getDomainSuggestion(query: string): string | null {
-  const clean = query.trim().toLowerCase();
-  if (!clean || clean.length < 2) return null;
-
-  // Exact or prefix match in dictionary
-  if (POPULAR_DOMAINS[clean]) {
-    return POPULAR_DOMAINS[clean];
+function formatDisplayUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname.replace(/^www\./, "");
+    const path = parsed.pathname === "/" ? "" : parsed.pathname;
+    return `${host}${path}`;
+  } catch {
+    return rawUrl
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/$/, "");
   }
-
-  // Check if starts with a dictionary key (e.g. "figm" -> "figma.com")
-  for (const [key, domain] of Object.entries(POPULAR_DOMAINS)) {
-    if (key.startsWith(clean) && clean.length >= 3) {
-      return domain;
-    }
-  }
-
-  return null;
 }
 
 /**
- * Fetches live search auto-complete suggestions from Google's standard public suggestion endpoint.
- * (The same engine used in Chrome, Brave, and Edge omnibars).
+ * Fetches real-time, live Google Chrome Omnibar suggestions:
+ * - Relevance-ranked search queries
+ * - Dynamic navigational website links with live page titles (no hardcoded lists)
+ * - Live calculator / math results
  */
-export async function fetchLiveSearchSuggestions(query: string, signal?: AbortSignal): Promise<string[]> {
+export async function fetchGoogleSuggestions(query: string, signal?: AbortSignal): Promise<GoogleSuggestion[]> {
   const clean = query.trim();
-  if (!clean || clean.length < 2) return [];
+  if (!clean || clean.length < 1) return [];
 
-  // Skip URL-like inputs
-  if (clean.includes("://") || clean.includes("localhost") || clean.match(/^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/)) {
+  const cacheKey = clean.toLowerCase();
+  const cached = suggestionCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.suggestions;
+  }
+
+  // Skip live query lookup if the user entered an explicit URL with protocol or localhost
+  if (clean.includes("://") || clean.startsWith("localhost:") || clean.startsWith("localhost/")) {
     return [];
   }
 
-  const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(clean)}`;
+  const url = `https://suggestqueries.google.com/complete/search?client=chrome&hl=en&q=${encodeURIComponent(clean)}`;
 
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1500); // 1.5s max timeout
 
-    // Link incoming signal if provided
     if (signal) {
       signal.addEventListener("abort", () => controller.abort());
     }
@@ -84,14 +73,94 @@ export async function fetchLiveSearchSuggestions(query: string, signal?: AbortSi
 
     if (!response.ok) return [];
 
-    const data = (await response.json()) as [string, string[]];
-    if (Array.isArray(data) && Array.isArray(data[1])) {
-      // Exclude exact duplicate of the typed query and take top 4
-      return data[1].filter((item) => item.toLowerCase() !== clean.toLowerCase()).slice(0, 4);
+    type GoogleSuggestData = [
+      string, // query
+      string[], // suggestions
+      string[], // descriptions
+      unknown[], // extra info
+      {
+        "google:suggesttype"?: string[];
+        "google:suggestrelevance"?: number[];
+      }?,
+    ];
+
+    const data = (await response.json()) as GoogleSuggestData;
+    if (!Array.isArray(data) || !Array.isArray(data[1])) {
+      return [];
     }
-    return [];
+
+    const rawSuggestions = data[1];
+    const rawDescriptions = Array.isArray(data[2]) ? data[2] : [];
+    const meta = data[4] || {};
+    const suggestTypes = meta["google:suggesttype"] || [];
+    const suggestRelevance = meta["google:suggestrelevance"] || [];
+
+    const results: GoogleSuggestion[] = [];
+    const seenTexts = new Set<string>();
+
+    for (let i = 0; i < rawSuggestions.length; i++) {
+      const itemText = rawSuggestions[i]?.trim();
+      if (!itemText) continue;
+
+      const rawType = suggestTypes[i] || "";
+      const rawDesc = rawDescriptions[i]?.trim() || "";
+      const relevance = typeof suggestRelevance[i] === "number" ? suggestRelevance[i] : 1000 - i;
+
+      let type: GoogleSuggestionType = "QUERY";
+      let destinationUrl: string | undefined;
+      let displayTitle = itemText;
+      let cleanText = itemText;
+
+      if (rawType === "NAVIGATION" || itemText.startsWith("http://") || itemText.startsWith("https://")) {
+        type = "NAVIGATION";
+        destinationUrl =
+          itemText.startsWith("http://") || itemText.startsWith("https://") ? itemText : `https://${itemText}`;
+        cleanText = formatDisplayUrl(destinationUrl);
+        displayTitle = rawDesc || cleanText;
+      } else if (rawType === "CALCULATOR" || itemText.startsWith("= ") || rawDesc.toLowerCase() === "calculator") {
+        type = "CALCULATOR";
+        cleanText = itemText.replace(/^=\s*/, "");
+        displayTitle = itemText;
+      } else {
+        type = "QUERY";
+        // If the query suggestion is identical to what the user already typed, skip it
+        if (cleanText.toLowerCase() === clean.toLowerCase()) {
+          continue;
+        }
+      }
+
+      const dedupeKey = `${type}:${cleanText.toLowerCase()}`;
+      if (seenTexts.has(dedupeKey)) continue;
+      seenTexts.add(dedupeKey);
+
+      results.push({
+        id: `google_${type.toLowerCase()}_${i}_${cleanText.substring(0, 30)}`,
+        text: cleanText,
+        type,
+        url: destinationUrl,
+        title: displayTitle !== cleanText ? displayTitle : undefined,
+        relevance,
+      });
+    }
+
+    // Sort strictly by relevance descending
+    results.sort((a, b) => b.relevance - a.relevance);
+
+    // Limit to top 7 items
+    const limited = results.slice(0, 7);
+
+    // Cache in memory for instant typing/backspacing
+    if (suggestionCache.size >= MAX_CACHE_ENTRIES) {
+      const oldestKey = suggestionCache.keys().next().value;
+      if (oldestKey) suggestionCache.delete(oldestKey);
+    }
+    suggestionCache.set(cacheKey, {
+      suggestions: limited,
+      timestamp: Date.now(),
+    });
+
+    return limited;
   } catch {
-    // Graceful silent fallback if offline or aborted
     return [];
   }
 }

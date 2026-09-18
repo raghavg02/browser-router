@@ -33,7 +33,7 @@ import {
   getPreferredProfileId,
   setPreferredProfileId,
 } from "./utils/historyStorage";
-import { getDomainSuggestion, fetchLiveSearchSuggestions, filterMatchingHistory } from "./utils/suggestionService";
+import { fetchGoogleSuggestions, GoogleSuggestion, filterMatchingHistory } from "./utils/suggestionService";
 
 export default function Command(props: LaunchProps<{ arguments: { query?: string }; fallbackText?: string }>) {
   const preferences = getPreferenceValues<Preferences.BrowserRouter>();
@@ -72,7 +72,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
   const [history, setHistory] = useState<LaunchHistoryItem[]>([]);
-  const [liveSuggestions, setLiveSuggestions] = useState<string[]>([]);
+  const [googleSuggestions, setGoogleSuggestions] = useState<GoogleSuggestion[]>([]);
 
   useEffect(() => {
     async function checkFirstRun() {
@@ -137,40 +137,34 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return profiles.find((p) => p.isFavorite) || profiles[0];
   }, [profiles]);
 
-  // Domain autocomplete (e.g. "gith" -> "github.com")
-  const domainMatch = useMemo(() => {
-    if (preferences.enableLiveSuggestions === false || mode !== "query" || isQueryLocked) return null;
-    return getDomainSuggestion(searchQuery);
-  }, [searchQuery, mode, preferences.enableLiveSuggestions, isQueryLocked]);
-
   // Matching past history items
   const matchingHistory = useMemo(() => {
     if (preferences.enableHistory === false || mode !== "query" || isQueryLocked) return [];
     return filterMatchingHistory(history, searchQuery, 2);
   }, [history, searchQuery, mode, preferences.enableHistory, isQueryLocked]);
 
-  // Debounced live search suggestions from Google
+  // Debounced live suggestions from Google Chrome Omnibar engine (100ms, character 1+)
   useEffect(() => {
     if (preferences.enableLiveSuggestions === false || mode !== "query" || isQueryLocked) {
-      setLiveSuggestions([]);
+      setGoogleSuggestions([]);
       return;
     }
 
     const trimmed = searchQuery.trim();
-    if (trimmed.length < 2) {
-      setLiveSuggestions([]);
+    if (trimmed.length < 1) {
+      setGoogleSuggestions([]);
       return;
     }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
-        const results = await fetchLiveSearchSuggestions(trimmed, controller.signal);
-        setLiveSuggestions(results);
+        const results = await fetchGoogleSuggestions(trimmed, controller.signal);
+        setGoogleSuggestions(results);
       } catch {
-        setLiveSuggestions([]);
+        setGoogleSuggestions([]);
       }
-    }, 180);
+    }, 100);
 
     return () => {
       clearTimeout(timeoutId);
@@ -568,116 +562,205 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     );
   }
 
-  function renderDomainMatchItem(domain: string) {
-    const url = `https://${domain}`;
-    return (
-      <List.Item
-        key={`domain_${domain}`}
-        id={`domain_${domain}`}
-        icon={Icon.Link}
-        title={domain}
-        subtitle="Direct Domain"
-        accessories={[{ text: "Enter to select", icon: Icon.ArrowRight }]}
-        actions={
-          <ActionPanel>
-            <ActionPanel.Section>
-              <Action
-                title="Select Suggestion"
-                icon={Icon.ArrowRight}
-                onAction={() => handleSelectSuggestion(domain, false)}
-              />
-              <Action
-                title="Select for Incognito Launch"
-                icon={Icon.EyeSlash}
-                shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleSelectSuggestion(domain, true)}
-              />
-              {preferences.quickLaunchShortcutEnabled !== false ? (
-                preferredProfile ? (
-                  <Action
-                    title={`Quick-Launch in ${preferredProfile.displayName}`}
-                    icon={Icon.Bolt}
-                    shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={() => handleLaunch(preferredProfile, false, url, domain)}
-                  />
-                ) : (
-                  <Action
-                    title="Quick-Launch (Set Preferred Profile First…)"
-                    icon={Icon.Bolt}
-                    shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={promptSetPreferredProfile}
-                  />
-                )
-              ) : null}
-            </ActionPanel.Section>
-
-            <ActionPanel.Section title="Search & Filter Mode">
-              <Action
-                title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
-                icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
-                shortcut={{ modifiers: [], key: "tab" }}
-                onAction={toggleMode}
-              />
-            </ActionPanel.Section>
-
-            {defaultProfile ? (
-              <ActionPanel.Section title="Open in Specific Profile">
-                {profiles.map((p) => (
-                  <Action
-                    key={`domain_profile_${p.id}`}
-                    title={`Open in ${p.displayName}`}
-                    icon={getProfileIcon(p)}
-                    onAction={() => handleLaunch(p, false, url, domain)}
-                  />
-                ))}
+  function renderGoogleSuggestionItem(item: GoogleSuggestion) {
+    if (item.type === "CALCULATOR") {
+      const calcQueryUrl = buildTargetUrl(
+        item.text,
+        preferences.defaultSearchEngine || "google",
+        preferences.customSearchUrl,
+      );
+      return (
+        <List.Item
+          key={item.id}
+          id={item.id}
+          icon={Icon.Calculator}
+          title={item.title || `= ${item.text}`}
+          subtitle="Calculator"
+          accessories={[{ text: "Copy Result", icon: Icon.Clipboard }]}
+          actions={
+            <ActionPanel>
+              <ActionPanel.Section>
+                <Action.CopyToClipboard title="Copy Result to Clipboard" content={item.text} />
+                <Action
+                  title="Use in Search Bar"
+                  icon={Icon.ArrowRight}
+                  onAction={() => handleSelectSuggestion(item.text, false)}
+                />
+                {preferences.quickLaunchShortcutEnabled !== false ? (
+                  preferredProfile ? (
+                    <Action
+                      title={`Quick-Launch Calculation in ${preferredProfile.displayName}`}
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["shift"], key: "enter" }}
+                      onAction={() => handleLaunch(preferredProfile, false, calcQueryUrl, item.text)}
+                    />
+                  ) : (
+                    <Action
+                      title="Quick-Launch (Set Preferred Profile First…)"
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["shift"], key: "enter" }}
+                      onAction={promptSetPreferredProfile}
+                    />
+                  )
+                ) : null}
               </ActionPanel.Section>
-            ) : null}
 
-            <ActionPanel.Section title="History">
-              <Action.Push
-                title="View All Launch History…"
-                icon={Icon.Clock}
-                shortcut={{ modifiers: ["ctrl", "shift"], key: "h" }}
-                target={
-                  <LaunchHistoryView
-                    initialHistory={history}
-                    profiles={profiles}
-                    onSelectQuery={(q) => handleSelectSuggestion(q, false)}
-                    onLaunch={handleLaunch}
-                    onHistoryUpdated={setHistory}
-                  />
-                }
-              />
-            </ActionPanel.Section>
-          </ActionPanel>
-        }
-      />
+              <ActionPanel.Section title="Search & Filter Mode">
+                <Action
+                  title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                  icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
+                  shortcut={{ modifiers: [], key: "tab" }}
+                  onAction={toggleMode}
+                />
+              </ActionPanel.Section>
+
+              {defaultProfile ? (
+                <ActionPanel.Section title="Search in Specific Profile">
+                  {profiles.map((p) => (
+                    <Action
+                      key={`calc_profile_${p.id}`}
+                      title={`Search in ${p.displayName}`}
+                      icon={getProfileIcon(p)}
+                      onAction={() => handleLaunch(p, false, calcQueryUrl, item.text)}
+                    />
+                  ))}
+                </ActionPanel.Section>
+              ) : null}
+
+              <ActionPanel.Section title="History">
+                <Action.Push
+                  title="View All Launch History…"
+                  icon={Icon.Clock}
+                  shortcut={{ modifiers: ["ctrl", "shift"], key: "h" }}
+                  target={
+                    <LaunchHistoryView
+                      initialHistory={history}
+                      profiles={profiles}
+                      onSelectQuery={(q) => handleSelectSuggestion(q, false)}
+                      onLaunch={handleLaunch}
+                      onHistoryUpdated={setHistory}
+                    />
+                  }
+                />
+              </ActionPanel.Section>
+            </ActionPanel>
+          }
+        />
+      );
+    }
+
+    if (item.type === "NAVIGATION" && item.url) {
+      const url = item.url;
+      return (
+        <List.Item
+          key={item.id}
+          id={item.id}
+          icon={Icon.Globe}
+          title={item.text}
+          subtitle={item.title}
+          accessories={[{ text: "Website", icon: Icon.Link }]}
+          actions={
+            <ActionPanel>
+              <ActionPanel.Section>
+                <Action
+                  title="Select Website"
+                  icon={Icon.ArrowRight}
+                  onAction={() => handleSelectSuggestion(url, false)}
+                />
+                <Action
+                  title="Select for Incognito Launch"
+                  icon={Icon.EyeSlash}
+                  shortcut={{ modifiers: ["ctrl"], key: "enter" }}
+                  onAction={() => handleSelectSuggestion(url, true)}
+                />
+                {preferences.quickLaunchShortcutEnabled !== false ? (
+                  preferredProfile ? (
+                    <Action
+                      title={`Quick-Launch in ${preferredProfile.displayName}`}
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["shift"], key: "enter" }}
+                      onAction={() => handleLaunch(preferredProfile, false, url, item.text)}
+                    />
+                  ) : (
+                    <Action
+                      title="Quick-Launch (Set Preferred Profile First…)"
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["shift"], key: "enter" }}
+                      onAction={promptSetPreferredProfile}
+                    />
+                  )
+                ) : null}
+              </ActionPanel.Section>
+
+              <ActionPanel.Section title="Search & Filter Mode">
+                <Action
+                  title={mode === "query" ? "Switch to Profile Filter Mode" : "Switch to Search Query Mode"}
+                  icon={mode === "query" ? Icon.Filter : Icon.MagnifyingGlass}
+                  shortcut={{ modifiers: [], key: "tab" }}
+                  onAction={toggleMode}
+                />
+              </ActionPanel.Section>
+
+              {defaultProfile ? (
+                <ActionPanel.Section title="Open in Specific Profile">
+                  {profiles.map((p) => (
+                    <Action
+                      key={`nav_profile_${p.id}`}
+                      title={`Open in ${p.displayName}`}
+                      icon={getProfileIcon(p)}
+                      onAction={() => handleLaunch(p, false, url, item.text)}
+                    />
+                  ))}
+                </ActionPanel.Section>
+              ) : null}
+
+              <ActionPanel.Section title="History">
+                <Action.Push
+                  title="View All Launch History…"
+                  icon={Icon.Clock}
+                  shortcut={{ modifiers: ["ctrl", "shift"], key: "h" }}
+                  target={
+                    <LaunchHistoryView
+                      initialHistory={history}
+                      profiles={profiles}
+                      onSelectQuery={(q) => handleSelectSuggestion(q, false)}
+                      onLaunch={handleLaunch}
+                      onHistoryUpdated={setHistory}
+                    />
+                  }
+                />
+              </ActionPanel.Section>
+            </ActionPanel>
+          }
+        />
+      );
+    }
+
+    // Default: QUERY suggestion
+    const queryUrl = buildTargetUrl(
+      item.text,
+      preferences.defaultSearchEngine || "google",
+      preferences.customSearchUrl,
     );
-  }
-
-  function renderLiveSuggestionItem(suggestion: string) {
-    const url = buildTargetUrl(suggestion, preferences.defaultSearchEngine || "google", preferences.customSearchUrl);
     return (
       <List.Item
-        key={`suggest_${suggestion}`}
-        id={`suggest_${suggestion}`}
+        key={item.id}
+        id={item.id}
         icon={Icon.MagnifyingGlass}
-        title={suggestion}
-        subtitle="Search Suggestion"
-        accessories={[{ text: "Enter to select", icon: Icon.ArrowRight }]}
+        title={item.text}
         actions={
           <ActionPanel>
             <ActionPanel.Section>
               <Action
                 title="Select Suggestion"
                 icon={Icon.ArrowRight}
-                onAction={() => handleSelectSuggestion(suggestion, false)}
+                onAction={() => handleSelectSuggestion(item.text, false)}
               />
               <Action
                 title="Select for Incognito Launch"
                 icon={Icon.EyeSlash}
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
-                onAction={() => handleSelectSuggestion(suggestion, true)}
+                onAction={() => handleSelectSuggestion(item.text, true)}
               />
               {preferences.quickLaunchShortcutEnabled !== false ? (
                 preferredProfile ? (
@@ -685,7 +768,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                     title={`Quick-Launch in ${preferredProfile.displayName}`}
                     icon={Icon.Bolt}
                     shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={() => handleLaunch(preferredProfile, false, url, suggestion)}
+                    onAction={() => handleLaunch(preferredProfile, false, queryUrl, item.text)}
                   />
                 ) : (
                   <Action
@@ -711,10 +794,10 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               <ActionPanel.Section title="Search in Specific Profile">
                 {profiles.map((p) => (
                   <Action
-                    key={`suggest_profile_${p.id}`}
+                    key={`query_profile_${p.id}`}
                     title={`Search in ${p.displayName}`}
                     icon={getProfileIcon(p)}
-                    onAction={() => handleLaunch(p, false, url, suggestion)}
+                    onAction={() => handleLaunch(p, false, queryUrl, item.text)}
                   />
                 ))}
               </ActionPanel.Section>
@@ -856,8 +939,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     (preferences.enableLiveSuggestions !== false || preferences.enableHistory !== false) &&
     !isQueryLocked &&
     mode === "query" &&
-    searchQuery.trim().length >= 2 &&
-    ((preferences.enableLiveSuggestions !== false && (!!domainMatch || liveSuggestions.length > 0)) ||
+    searchQuery.trim().length >= 1 &&
+    ((preferences.enableLiveSuggestions !== false && googleSuggestions.length > 0) ||
       (preferences.enableHistory !== false && matchingHistory.length > 0));
 
   const hasRecents =
@@ -908,9 +991,8 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       {/* SUGGESTIONS & AUTOCOMPLETE (Only when typing in query mode) */}
       {hasSuggestions ? (
         <List.Section title="Suggestions & Autocomplete">
-          {domainMatch ? renderDomainMatchItem(domainMatch) : null}
           {matchingHistory.map(renderMatchingHistoryItem)}
-          {liveSuggestions.map(renderLiveSuggestionItem)}
+          {googleSuggestions.map(renderGoogleSuggestionItem)}
         </List.Section>
       ) : null}
 
