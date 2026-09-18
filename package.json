@@ -78,18 +78,18 @@
     },
     {
       "name": "enableLiveSuggestions",
-      "title": "Live Search Suggestions",
-      "label": "Enable live Google suggestions and domain autocomplete",
-      "description": "Show live query suggestions and popular domain autocompletion while typing",
+      "title": "Live Suggestions",
+      "label": "Enable live search suggestions and domain autocomplete",
+      "description": "Show live search suggestions and popular domain autocompletion while typing",
       "type": "checkbox",
       "required": false,
       "default": true
     },
     {
       "name": "enableHistory",
-      "title": "Launch History & Recents",
-      "label": "Enable recent launches and past query recall",
-      "description": "Show recent launches when the search bar is empty and recall matching past queries while typing",
+      "title": "Previous Search History",
+      "label": "Enable previous search history and recent launches",
+      "description": "Show previous search history when the search bar is empty and recall matching queries while typing",
       "type": "checkbox",
       "required": false,
       "default": true
