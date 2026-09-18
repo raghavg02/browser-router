@@ -77,10 +77,28 @@
       "placeholder": "https://kagi.com/search?q=%s"
     },
     {
-      "name": "enableSuggestions",
-      "title": "Search Suggestions & Recents",
-      "label": "Show search suggestions and recents",
-      "description": "Show live query suggestions, domain completion, and recent launch history above the browser list",
+      "name": "enableLiveSuggestions",
+      "title": "Live Search Suggestions",
+      "label": "Enable live Google suggestions and domain autocomplete",
+      "description": "Show live query suggestions and popular domain autocompletion while typing",
+      "type": "checkbox",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "enableHistory",
+      "title": "Launch History & Recents",
+      "label": "Enable recent launches and past query recall",
+      "description": "Show recent launches when the search bar is empty and recall matching past queries while typing",
+      "type": "checkbox",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "quickLaunchShortcutEnabled",
+      "title": "Preferred Profile Quick-Launch",
+      "label": "Enable Quick-Launch shortcut on suggestions",
+      "description": "Allows pressing Shift + Enter on any suggestion to immediately launch in your designated preferred profile",
       "type": "checkbox",
       "required": false,
       "default": true

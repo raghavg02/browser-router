@@ -2,7 +2,8 @@ import { LocalStorage } from "@raycast/api";
 import { BrowserProfile } from "../types";
 
 const HISTORY_STORAGE_KEY = "browser_router_launch_history";
-const MAX_HISTORY_ITEMS = 50;
+const PREFERRED_PROFILE_STORAGE_KEY = "browser_router_preferred_profile_id";
+const MAX_HISTORY_ITEMS = 200;
 
 export interface LaunchHistoryItem {
   id: string;
@@ -120,5 +121,32 @@ export async function clearAllHistory(): Promise<void> {
     await LocalStorage.removeItem(HISTORY_STORAGE_KEY);
   } catch (error) {
     console.error("[browser-router] Failed to clear history", error);
+  }
+}
+
+/**
+ * Gets the designated preferred quick-launch browser profile ID.
+ */
+export async function getPreferredProfileId(): Promise<string | null> {
+  try {
+    const id = await LocalStorage.getItem<string>(PREFERRED_PROFILE_STORAGE_KEY);
+    return id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sets or clears the designated preferred quick-launch browser profile ID.
+ */
+export async function setPreferredProfileId(profileId: string | null): Promise<void> {
+  try {
+    if (profileId) {
+      await LocalStorage.setItem(PREFERRED_PROFILE_STORAGE_KEY, profileId);
+    } else {
+      await LocalStorage.removeItem(PREFERRED_PROFILE_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.error("[browser-router] Failed to set preferred profile", error);
   }
 }
