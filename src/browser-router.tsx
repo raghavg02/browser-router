@@ -273,20 +273,11 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
   }
 
   async function promptSetPreferredProfile() {
-    const confirmed = await confirmAlert({
-      title: "Set Quick-Launch Profile",
-      message:
-        "You haven't set a preferred Quick-Launch profile yet.\n\nHighlight any browser profile in the list and press Ctrl + Shift + P to designate it.",
-      primaryAction: {
-        title: "Focus Profiles",
-      },
-      dismissAction: {
-        title: "Cancel",
-      },
+    await showToast({
+      style: Toast.Style.Failure,
+      title: "No Preferred Profile Set",
+      message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
     });
-    if (confirmed && firstProfileId) {
-      setSelectedItemId(firstProfileId);
-    }
   }
 
   function handleSelectSuggestion(selectedText: string, incognito = false) {
