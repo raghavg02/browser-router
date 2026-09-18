@@ -43,14 +43,18 @@ function formatDisplayUrl(rawUrl: string): string {
  * - Dynamic navigational website links with live page titles (no hardcoded lists)
  * - Live calculator / math results
  */
-export async function fetchGoogleSuggestions(query: string, signal?: AbortSignal): Promise<GoogleSuggestion[]> {
+export async function fetchGoogleSuggestions(
+  query: string,
+  limit = 4,
+  signal?: AbortSignal,
+): Promise<GoogleSuggestion[]> {
   const clean = query.trim();
   if (!clean || clean.length < 1) return [];
 
   const cacheKey = clean.toLowerCase();
   const cached = suggestionCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return cached.suggestions;
+    return cached.suggestions.slice(0, limit);
   }
 
   // Skip live query lookup if the user entered an explicit URL with protocol or localhost
@@ -146,20 +150,17 @@ export async function fetchGoogleSuggestions(query: string, signal?: AbortSignal
     // Sort strictly by relevance descending
     results.sort((a, b) => b.relevance - a.relevance);
 
-    // Limit to top 7 items
-    const limited = results.slice(0, 7);
-
     // Cache in memory for instant typing/backspacing
     if (suggestionCache.size >= MAX_CACHE_ENTRIES) {
       const oldestKey = suggestionCache.keys().next().value;
       if (oldestKey) suggestionCache.delete(oldestKey);
     }
     suggestionCache.set(cacheKey, {
-      suggestions: limited,
+      suggestions: results,
       timestamp: Date.now(),
     });
 
-    return limited;
+    return results.slice(0, limit);
   } catch {
     return [];
   }

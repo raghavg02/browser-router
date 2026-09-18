@@ -143,6 +143,13 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     return filterMatchingHistory(history, searchQuery, 2);
   }, [history, searchQuery, mode, preferences.enableHistory, isQueryLocked]);
 
+  const maxSuggestionsLimit = useMemo(() => {
+    const pref = preferences.maxSuggestionsCount;
+    if (pref === "max") return 15;
+    const parsed = parseInt(pref || "4", 10);
+    return isNaN(parsed) ? 4 : parsed;
+  }, [preferences.maxSuggestionsCount]);
+
   // Debounced live suggestions from Google Chrome Omnibar engine (100ms, character 1+)
   useEffect(() => {
     if (preferences.enableLiveSuggestions === false || mode !== "query" || isQueryLocked) {
@@ -159,7 +166,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     const controller = new AbortController();
     const timeoutId = setTimeout(async () => {
       try {
-        const results = await fetchGoogleSuggestions(trimmed, controller.signal);
+        const results = await fetchGoogleSuggestions(trimmed, maxSuggestionsLimit, controller.signal);
         setGoogleSuggestions(results);
       } catch {
         setGoogleSuggestions([]);
@@ -170,7 +177,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [searchQuery, mode, preferences.enableLiveSuggestions, isQueryLocked]);
+  }, [searchQuery, mode, preferences.enableLiveSuggestions, isQueryLocked, maxSuggestionsLimit]);
 
   async function handleLaunch(
     profile: BrowserProfile,
