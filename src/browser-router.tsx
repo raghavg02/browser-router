@@ -272,6 +272,23 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
     });
   }
 
+  async function promptSetPreferredProfile() {
+    const confirmed = await confirmAlert({
+      title: "Set Quick-Launch Profile",
+      message:
+        "You haven't set a preferred Quick-Launch profile yet.\n\nHighlight any browser profile in the list and press Ctrl + Shift + P to designate it.",
+      primaryAction: {
+        title: "Focus Profiles",
+      },
+      dismissAction: {
+        title: "Cancel",
+      },
+    });
+    if (confirmed && firstProfileId) {
+      setSelectedItemId(firstProfileId);
+    }
+  }
+
   function handleSelectSuggestion(selectedText: string, incognito = false) {
     setSearchQuery(selectedText);
     setIsQueryLocked(true);
@@ -465,15 +482,20 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
 
   function renderRecentHistoryItem(item: LaunchHistoryItem) {
     const matchedProfile = profiles.find((p) => p.id === item.profileId) || defaultProfile;
+    const isRedundantUrl =
+      item.resolvedUrl === item.query ||
+      item.resolvedUrl === `https://${item.query}` ||
+      item.resolvedUrl === `http://${item.query}` ||
+      item.resolvedUrl === `https://${item.query}/` ||
+      item.resolvedUrl === `http://${item.query}/`;
     return (
       <List.Item
         key={`recent_${item.id}`}
         id={`recent_${item.id}`}
         icon={Icon.Clock}
         title={item.query}
-        subtitle={item.resolvedUrl}
+        subtitle={isRedundantUrl ? undefined : item.resolvedUrl}
         accessories={[
-          { text: "Enter to use query", icon: Icon.Pencil },
           { text: item.profileDisplayName, icon: Icon.Globe },
           { date: new Date(item.timestamp), tooltip: `Last opened: ${new Date(item.timestamp).toLocaleString()}` },
         ]}
@@ -592,13 +614,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                     title="Quick-Launch (Set Preferred Profile First…)"
                     icon={Icon.Bolt}
                     shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={async () => {
-                      await showToast({
-                        style: Toast.Style.Failure,
-                        title: "No Preferred Profile Set",
-                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
-                      });
-                    }}
+                    onAction={promptSetPreferredProfile}
                   />
                 )
               ) : null}
@@ -685,13 +701,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                     title="Quick-Launch (Set Preferred Profile First…)"
                     icon={Icon.Bolt}
                     shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={async () => {
-                      await showToast({
-                        style: Toast.Style.Failure,
-                        title: "No Preferred Profile Set",
-                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
-                      });
-                    }}
+                    onAction={promptSetPreferredProfile}
                   />
                 )
               ) : null}
@@ -777,13 +787,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
                     title="Quick-Launch (Set Preferred Profile First…)"
                     icon={Icon.Bolt}
                     shortcut={{ modifiers: ["shift"], key: "enter" }}
-                    onAction={async () => {
-                      await showToast({
-                        style: Toast.Style.Failure,
-                        title: "No Preferred Profile Set",
-                        message: "Highlight any profile below and press Ctrl+Shift+P to set it as Quick-Launch.",
-                      });
-                    }}
+                    onAction={promptSetPreferredProfile}
                   />
                 )
               ) : null}
@@ -928,8 +932,7 @@ export default function Command(props: LaunchProps<{ arguments: { query?: string
               id="view_all_history_item"
               icon={Icon.Clock}
               title="View All Launch History…"
-              subtitle={`${history.length} past searches and links saved`}
-              accessories={[{ text: "Open History Manager", icon: Icon.ArrowRight }]}
+              accessories={[{ text: `${history.length} saved`, icon: Icon.Clock }]}
               actions={
                 <ActionPanel>
                   <Action.Push
