@@ -548,6 +548,15 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
     p.isFavorite = favIds.includes(p.id);
   }
 
+  // Always keep profiles organized in alphabetical order:
+  // 1. Group browsers alphabetically by browser name (A -> Z)
+  // 2. Sub-sort profiles within each browser by display name (A -> Z)
+  profiles.sort((a, b) => {
+    const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
+    if (browserCmp !== 0) return browserCmp;
+    return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
+  });
+
   return profiles;
 }
 

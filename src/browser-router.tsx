@@ -102,19 +102,25 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     });
   }
 
-  // Filter profiles when in "filter" mode, or show all when in "query" mode
+  // Filter profiles when in "filter" mode, or show all when in "query" mode (always sorted alphabetically)
   const displayedProfiles = useMemo(() => {
-    if (mode !== "filter" || !filterText.trim()) {
-      return profiles;
-    }
-    const q = filterText.toLowerCase().trim();
-    return profiles.filter((p) => {
-      const matchDisplay = p.displayName.toLowerCase().includes(q);
-      const matchBrowser = p.browserName.toLowerCase().includes(q);
-      const matchProfile = p.profileName.toLowerCase().includes(q);
-      const matchDir = p.profileDirectory.toLowerCase().includes(q);
-      const matchEmail = p.email ? p.email.toLowerCase().includes(q) : false;
-      return matchDisplay || matchBrowser || matchProfile || matchDir || matchEmail;
+    const list =
+      mode !== "filter" || !filterText.trim()
+        ? profiles
+        : profiles.filter((p) => {
+            const q = filterText.toLowerCase().trim();
+            const matchDisplay = p.displayName.toLowerCase().includes(q);
+            const matchBrowser = p.browserName.toLowerCase().includes(q);
+            const matchProfile = p.profileName.toLowerCase().includes(q);
+            const matchDir = p.profileDirectory.toLowerCase().includes(q);
+            const matchEmail = p.email ? p.email.toLowerCase().includes(q) : false;
+            return matchDisplay || matchBrowser || matchProfile || matchDir || matchEmail;
+          });
+
+    return [...list].sort((a, b) => {
+      const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
+      if (browserCmp !== 0) return browserCmp;
+      return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
     });
   }, [profiles, mode, filterText]);
 
