@@ -216,30 +216,6 @@ export async function launchBrowserProfile(
       let udd = profile.userDataDir ? profile.userDataDir.trim().replace(/^"|"$/g, "") : undefined;
       let profileDir = profile.profileDirectory ? profile.profileDirectory.trim().replace(/^"|"$/g, "") : undefined;
 
-      // For browsers like Dia and Arc that use a unified window shell and determine their active profile via Local State:
-      // Synchronize last_used in Local State so launching opens directly into the requested profile.
-      if ((profile.browserId === "dia" || profile.browserId === "arc") && (profile.userDataDir || udd) && profileDir) {
-        try {
-          const targetUdd = profile.userDataDir || udd;
-          if (targetUdd) {
-            const localStatePath = path.join(targetUdd, "Local State");
-            if (fs.existsSync(localStatePath)) {
-              const content = fs.readFileSync(localStatePath, "utf8");
-              const json = JSON.parse(content);
-              if (json.profile) {
-                json.profile.last_used = profileDir;
-                if (Array.isArray(json.profile.last_active_profiles)) {
-                  json.profile.last_active_profiles = [profileDir];
-                }
-                fs.writeFileSync(localStatePath, JSON.stringify(json), "utf8");
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Failed to sync last_used in Local State:", err);
-        }
-      }
-
       // If profileDir is an absolute path or contains directory separators, extract user-data root and subfolder
       if (profileDir && (path.isAbsolute(profileDir) || profileDir.includes("\\") || profileDir.includes("/"))) {
         if (!udd) {
@@ -253,17 +229,16 @@ export async function launchBrowserProfile(
       // Chrome and Edge standard profiles are specifically EXCLUDED from --user-data-dir:
       // 1. Chrome's singleton process model treats explicit --user-data-dir as a profile boundary mismatch, evicting active sign-in sessions.
       // 2. Edge's Startup Boost background service holds an exclusive lock on its User Data directory, causing hangs.
-      // Chrome, Edge, and Dia omit --user-data-dir:
+      // Chrome, Edge, Dia, and Arc omit --user-data-dir:
       // 1. Chrome: Passing --user-data-dir causes session detachment and breaks App-Bound encryption (guest mode).
       // 2. Edge: Passing --user-data-dir causes Startup Boost directory locks and session detachment.
-      // 3. Dia: Passing --user-data-dir detaches MSIX package credentials and triggers the "What's your work email?" onboarding flow.
+      // 3. Dia & Arc: Unified single-window browsers with package virtualization; passing --user-data-dir detaches credentials.
       if (
         profile.browserId === "brave" ||
         profile.browserId === "vivaldi" ||
-        profile.browserId === "arc" ||
         profile.browserId === "opera" ||
         profile.isCustom ||
-        !["chrome", "edge", "dia"].includes(profile.browserId)
+        !["chrome", "edge", "dia", "arc"].includes(profile.browserId)
       ) {
         if (!udd && process.platform === "win32") {
           const home = os.homedir();
@@ -273,8 +248,6 @@ export async function launchBrowserProfile(
             udd = path.join(localAppData, "BraveSoftware", "Brave-Browser", "User Data");
           } else if (profile.browserId === "vivaldi") {
             udd = path.join(localAppData, "Vivaldi", "User Data");
-          } else if (profile.browserId === "arc") {
-            udd = path.join(localAppData, "Arc", "User Data");
           } else if (profile.browserId === "opera") {
             udd = path.join(appData, "Opera Software", "Opera Stable");
           }

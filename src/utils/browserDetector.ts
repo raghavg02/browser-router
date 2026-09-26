@@ -12,6 +12,7 @@ interface ChromiumBrowserDef {
   userDir: string;
   fallbackIcon: string;
   exeCandidates: string[];
+  singleProfile?: boolean;
 }
 
 interface ChromiumProfileInfo {
@@ -302,6 +303,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
         path.join(localAppData, "Arc", "Application", "Arc.exe"),
         path.join(localAppData, "Microsoft", "WindowsApps", "Arc.exe"),
       ].filter(Boolean),
+      singleProfile: true,
     },
     {
       id: "opera",
@@ -348,6 +350,7 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
         path.join(localAppData, "Microsoft", "WindowsApps", "Dia.exe"),
         path.join(localAppData, "Dia", "Application", "Dia.exe"),
       ].filter(Boolean),
+      singleProfile: true,
     },
   ];
 
@@ -361,6 +364,27 @@ export async function detectInstalledProfiles(): Promise<BrowserProfile[]> {
 
     const extractedIcon = getExtractedAssetIcon(config.id, exe);
     const logoIcon = extractedIcon || findLogoInAppDir(exe);
+
+    // Browsers with unified window/spaces architecture (e.g. Dia, Arc) do not support multi-window CLI profile targeting.
+    // Emit a single clean top-level launcher entry for seamless URL and search routing.
+    if (config.singleProfile || config.id === "dia" || config.id === "arc") {
+      const profileId = `${config.id}_default`;
+      const customName = nicknames[profileId];
+      profiles.push({
+        id: profileId,
+        browserId: config.id,
+        browserName: config.name,
+        profileName: "Default",
+        displayName: customName || config.name,
+        profileDirectory: "default-no-arg",
+        executablePath: exe,
+        userDataDir: config.userDir,
+        iconPath: logoIcon,
+        fallbackIcon: config.fallbackIcon,
+      });
+      continue;
+    }
+
     const localStatePath = path.join(config.userDir, "Local State");
 
     const detectedForBrowser: BrowserProfile[] = [];
