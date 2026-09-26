@@ -224,7 +224,9 @@ export async function launchBrowserProfile(
         profile.browserId === "vivaldi" ||
         profile.browserId === "arc" ||
         profile.browserId === "opera" ||
-        profile.isCustom
+        profile.browserId === "dia" ||
+        profile.isCustom ||
+        !["chrome", "edge"].includes(profile.browserId)
       ) {
         if (!udd && process.platform === "win32") {
           const home = os.homedir();
@@ -238,6 +240,16 @@ export async function launchBrowserProfile(
             udd = path.join(localAppData, "Arc", "User Data");
           } else if (profile.browserId === "opera") {
             udd = path.join(appData, "Opera Software", "Opera Stable");
+          } else if (profile.browserId === "dia") {
+            udd = path.join(
+              localAppData,
+              "Packages",
+              "TheBrowserCompany.Dia_ttt1ap7aakyb4",
+              "LocalCache",
+              "Local",
+              "Dia",
+              "User Data",
+            );
           }
         }
         if (udd) {
