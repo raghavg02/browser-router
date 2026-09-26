@@ -229,14 +229,17 @@ export async function launchBrowserProfile(
       // Chrome and Edge standard profiles are specifically EXCLUDED from --user-data-dir:
       // 1. Chrome's singleton process model treats explicit --user-data-dir as a profile boundary mismatch, evicting active sign-in sessions.
       // 2. Edge's Startup Boost background service holds an exclusive lock on its User Data directory, causing hangs.
+      // Chrome, Edge, and Dia omit --user-data-dir:
+      // 1. Chrome: Passing --user-data-dir causes session detachment and breaks App-Bound encryption (guest mode).
+      // 2. Edge: Passing --user-data-dir causes Startup Boost directory locks and session detachment.
+      // 3. Dia: Passing --user-data-dir detaches MSIX package credentials and triggers the "What's your work email?" onboarding flow.
       if (
         profile.browserId === "brave" ||
         profile.browserId === "vivaldi" ||
         profile.browserId === "arc" ||
         profile.browserId === "opera" ||
-        profile.browserId === "dia" ||
         profile.isCustom ||
-        !["chrome", "edge"].includes(profile.browserId)
+        !["chrome", "edge", "dia"].includes(profile.browserId)
       ) {
         if (!udd && process.platform === "win32") {
           const home = os.homedir();
@@ -250,16 +253,6 @@ export async function launchBrowserProfile(
             udd = path.join(localAppData, "Arc", "User Data");
           } else if (profile.browserId === "opera") {
             udd = path.join(appData, "Opera Software", "Opera Stable");
-          } else if (profile.browserId === "dia") {
-            udd = path.join(
-              localAppData,
-              "Packages",
-              "TheBrowserCompany.Dia_ttt1ap7aakyb4",
-              "LocalCache",
-              "Local",
-              "Dia",
-              "User Data",
-            );
           }
         }
         if (udd) {
