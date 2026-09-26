@@ -5,6 +5,16 @@ import { spawn } from "child_process";
 import { showToast, Toast, closeMainWindow } from "@raycast/api";
 import { BrowserProfile } from "../types";
 
+function fileExists(filePath: string): boolean {
+  if (!filePath) return false;
+  try {
+    fs.accessSync(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getCleanBrowserEnv(): NodeJS.ProcessEnv {
   if (process.platform === "win32") {
     const standardWindowsKeys = new Set([
@@ -162,7 +172,7 @@ export async function launchBrowserProfile(
   incognito = false,
 ): Promise<boolean> {
   try {
-    if (!profile.executablePath || !fs.existsSync(profile.executablePath)) {
+    if (!profile.executablePath || !fileExists(profile.executablePath)) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Browser not found",
