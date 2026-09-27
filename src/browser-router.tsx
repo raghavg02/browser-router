@@ -81,6 +81,10 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     await LocalStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, true);
     await setLastSeenVersion(CURRENT_VERSION);
     setShowUpdateBanner(false);
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Announcement Dismissed",
+    });
   }
 
   async function handleResetUpdateBanner() {
