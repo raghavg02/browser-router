@@ -1,6 +1,6 @@
 # Browser Router Changelog
 
-## [v2.0.0] - {PR_MERGE_DATE}
+## [v1.1.0] - {PR_MERGE_DATE}
 
 - Added support for The Browser Company's **Dia** browser on Windows with automated execution alias discovery and credential preservation.
 - Added **Smart Profile Sorting** with 4 modes: Alphabetical (A → Z), Reverse Alphabetical (Z → A), Most Frequently Used (MRU with launch tracking), and Custom Order.

@@ -5,7 +5,7 @@ export function ChangelogView() {
 
   const markdown = `# 🚀 Browser Router Changelog & What's New
 
-## [v2.0.0] - Latest Update
+## [v1.1.0] - Latest Update
 
 ### 🌟 New Features
 * **Dia Browser Support**: Full automatic detection and zero-friction launching for The Browser Company's Dia beta on Windows with native credential preservation.

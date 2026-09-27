@@ -49,7 +49,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
   const [filterText, setFilterText] = useState<string>("");
 
-  const CURRENT_VERSION = "2.0.0";
+  const CURRENT_VERSION = "1.1.0";
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
           await setLastSeenVersion(CURRENT_VERSION);
           await showToast({
             style: Toast.Style.Success,
-            title: "Browser Router updated to v2.0!",
+            title: "Browser Router updated to v1.1!",
             message: "New: Custom Profile Reordering & Dia Browser support",
           });
         }
