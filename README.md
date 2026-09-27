@@ -14,7 +14,7 @@
     <a href="https://raycast.com"><img src="https://img.shields.io/badge/Raycast-Extension-red.svg?style=flat-square&logo=raycast&logoColor=white" alt="Raycast Extension" /></a>
     <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D4.svg?style=flat-square&logo=windows&logoColor=white" alt="Platform: Windows" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License: MIT" /></a>
-    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-blue.svg?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6.x-blue.svg?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
     <a href="PRIVACY.md"><img src="https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen.svg?style=flat-square" alt="100% Local" /></a>
   </p>
 
@@ -42,7 +42,7 @@
     <li><a href="#how-it-works-architecture">How It Works (Architecture)</a>
       <ul>
         <li><a href="#1-escaping-the-windows-job-object-sandbox">Windows Job Object Detachment</a></li>
-        <li><a href="#2-chromium-dual-argument-directory-targeting">Dual-Argument Directory Targeting</a></li>
+        <li><a href="#2-tailored-profile-directory-targeting-architecture">Tailored Profile Directory Targeting</a></li>
         <li><a href="#3-registry--local-state-metadata-discovery">Registry & Local State Discovery</a></li>
         <li><a href="#4-zero-overhead-url--query-classification">Zero-Overhead Input Classification</a></li>
       </ul>
@@ -78,7 +78,7 @@ On macOS, Raycast power users easily route links to specific browser profiles. O
 Browser Router is built with modern, lightweight, and type-safe technologies:
 
 * [![Raycast API](https://img.shields.io/badge/Raycast%20API-v1.104+-FF6363?style=flat-square&logo=raycast&logoColor=white)](https://developers.raycast.com/) — Native Windows desktop UI and action system
-* [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) — Type safety and robust data structures
+* [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) — Type safety and robust data structures
 * [![React](https://img.shields.io/badge/React-19.x-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/) — Declarative component architecture
 * [![Node.js](https://img.shields.io/badge/Node.js-Process%20Engine-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/) — Libuv detached process spawning
 * [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Worker%20Relay-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/) — Encrypted serverless edge relay for feedback
@@ -96,7 +96,7 @@ Browser Router is built with modern, lightweight, and type-safe technologies:
   Seamlessly accepts queries from **Raycast Root Search** (press <kbd>Tab</kbd>) or acts as an automatic **Fallback Command**.
 
 * 🔍 **Deep Profile & Avatar Auto-Discovery**  
-  Scans the Windows Registry and parses browser metadata (`Local State`, `Preferences`) to discover profiles, display names, and profile pictures.
+  Scans the Windows Registry and parses browser metadata (`Local State` plus profile avatars) to discover profiles, display names, and profile pictures.
 
 * 🌐 **Smart URL vs. Query Classification**  
   Differentiates between plain text searches, bare domains (`github.com`), and local dev servers (`localhost:3000`, `127.0.0.1:8080`).
@@ -121,36 +121,36 @@ Browser Router is built with modern, lightweight, and type-safe technologies:
     <td align="center" width="50%">
       <h3>1. Root Search Fast Routing</h3>
       <p><i>Type your search query directly from Raycast Root Search with Tab-completion.</i></p>
-      <img src="assets/screenshots/showcase/01_root_search.png" alt="Root Search" width="460" />
+      <img src="media/01_root_search.png" alt="Root Search" width="460" />
     </td>
     <td align="center" width="50%">
       <h3>2. Intelligent Query & URL Lexing</h3>
       <p><i>Auto-detects localhost, dev ports, bare domains, and search queries.</i></p>
-      <img src="assets/screenshots/showcase/02_query_routing.png" alt="Query Routing" width="460" />
+      <img src="media/02_query_routing.png" alt="Query Routing" width="460" />
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
       <h3>3. Real-Time Profile Filtering</h3>
       <p><i>Filter profiles instantly by browser brand, account email, or nickname.</i></p>
-      <img src="assets/screenshots/showcase/03_profile_filter.png" alt="Profile Filtering" width="460" />
+      <img src="media/03_profile_filter.png" alt="Profile Filtering" width="460" />
     </td>
     <td align="center" width="50%">
       <h3>4. Power Action Panel</h3>
       <p><i>Instant access to profile renaming, custom setups, link copying, and feedback.</i></p>
-      <img src="assets/screenshots/showcase/04_action_panel.png" alt="Action Panel" width="460" />
+      <img src="media/04_action_panel.png" alt="Action Panel" width="460" />
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
       <h3>5. In-Place Profile Renaming</h3>
       <p><i>Assign clean labels without modifying browser preferences on disk.</i></p>
-      <img src="assets/screenshots/showcase/05_rename_profile.png" alt="Rename Profile" width="460" />
+      <img src="media/05_rename_profile.png" alt="Rename Profile" width="460" />
     </td>
     <td align="center" width="50%">
       <h3>6. Custom & Portable Setups</h3>
       <p><i>Add portable installations, custom directories, or Canary builds.</i></p>
-      <img src="assets/screenshots/showcase/06_custom_profile.png" alt="Custom Profiles" width="460" />
+      <img src="media/06_custom_profile.png" alt="Custom Profiles" width="460" />
     </td>
   </tr>
 </table>
@@ -178,7 +178,7 @@ flowchart TD
     subgraph Discovery ["3. Registry & Profile Resolver"]
         D --> F[Locate Target Browser & User Data Dir]
         E --> F
-        F --> G[Extract Profile Directory & Preferences]
+        F --> G[Extract Profile Directory & Local State]
     end
 
     subgraph Launcher ["4. Native Detachment Engine"]
@@ -209,18 +209,22 @@ child.unref();
 
 <br />
 
-### 2. Chromium Dual-Argument Directory Targeting
-Passing `--profile-directory="Profile 1"` alone is fragile on Windows. If Chromium is launched outside native shell associations, it defaults to the generic default user data root.
+### 2. Tailored Profile Directory Targeting Architecture
+Launching browser profiles reliably on Windows requires a tailored command-line strategy:
 
-Browser Router dynamically detects and pairs the root user data directory with the profile folder:
-```typescript
-const launchArgs = [
-  `--user-data-dir=${browser.userDataDir}`,
-  `--profile-directory=${profile.directoryName}`,
-  targetUrl,
-];
-```
-This guarantees deterministic profile targeting across Chrome, Edge, Brave, Vivaldi, and Arc.
+* **Brave, Vivaldi, Arc, Opera & Custom Profiles**:
+  Browser Router dynamically detects and pairs the root user data directory with the profile folder:
+  ```typescript
+  const launchArgs = [
+    `--user-data-dir=${browser.userDataDir}`,
+    `--profile-directory=${profile.directoryName}`,
+    targetUrl,
+  ];
+  ```
+  This guarantees deterministic profile targeting and prevents MSIX container virtualization.
+
+* **Google Chrome & Microsoft Edge**:
+  Passes `--profile-directory=${profile.directoryName}` while deliberately omitting `--user-data-dir`. This respects Chrome's singleton process model (preventing profile detachment and session logout) and avoids conflicts with Edge's background Startup Boost locks.
 
 <br />
 
@@ -230,14 +234,14 @@ Rather than hardcoding filesystem paths, Browser Router inspects both Windows Re
 * `HKLM\Software\Clients\StartMenuInternet` (System-wide installations)
 
 It reads the registered shell command, extracts the executable binary, and parses:
-* **`Local State`**: Extracts profile avatars, high-resolution badge icons, and Google/Microsoft account emails.
-* **`Preferences`**: Inspects profile-level settings for custom user nicknames.
+* **`Local State`**: Extracts profile display names, high-resolution badge icons, and Google/Microsoft account emails.
+* **Profile Avatars**: Resolves cached profile pictures and custom avatar assets from the profile directory.
 
 <br />
 
 ### 4. Zero-Overhead URL & Query Classification
 An instantaneous regex-free tokenizer classifies user input in real time:
-* **Full URLs**: Matches valid schemas (`https://`, `http://`, `raycast://`, `file://`).
+* **Full URLs**: Matches valid schemas (`https://`, `http://`, `file://`, and browser-internal protocols like `chrome://`, `edge://`, `brave://`).
 * **Localhost & Ports**: Matches `localhost`, `127.0.0.1`, `::1`, and custom port bindings (`:3000`, `:8080`).
 * **Bare Domains**: Identifies valid top-level domains (`.com`, `.dev`, `.ai`, `.org`, etc.) and automatically prepends `https://`.
 * **Search Queries**: Cleanly URL-encodes multi-word queries into your chosen engine template.
@@ -293,8 +297,8 @@ Search for **Browser Router** in the Raycast Store and click **Install Extension
 ### Local Development Setup
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/raghavg02/browser-router.git
-   cd browser-router
+   git clone https://github.com/raycast/extensions.git
+   cd extensions/browser-router
    ```
 
 2. **Install dependencies:**
