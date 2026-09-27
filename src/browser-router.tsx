@@ -13,15 +13,25 @@ import {
   LocalStorage,
 } from "@raycast/api";
 import { useEffect, useState, useMemo } from "react";
-import { BrowserProfile } from "./types";
+import { BrowserProfile, SortMode } from "./types";
 import { detectAllProfiles } from "./utils/browserDetector";
 import { buildTargetUrl } from "./utils/urlHelper";
 import { launchBrowserProfile } from "./utils/launcher";
-import { toggleFavorite, removeCustomProfile } from "./utils/storage";
+import {
+  toggleFavorite,
+  removeCustomProfile,
+  getSortMode,
+  setSortMode,
+  getCustomProfileOrder,
+  setCustomProfileOrder,
+  getProfileLaunchCounts,
+  recordProfileLaunch,
+} from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
 import { RenameProfileForm } from "./components/RenameProfileForm";
 import { FeedbackForm } from "./components/FeedbackForm";
 import { UserManualView } from "./components/UserManualView";
+import { ReorderProfilesView } from "./components/ReorderProfilesView";
 
 export default function Command(props: LaunchProps<{ arguments: Arguments.BrowserRouter; fallbackText?: string }>) {
   const preferences = getPreferenceValues<Preferences>();
@@ -52,13 +62,24 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   }
 
   const [profiles, setProfiles] = useState<BrowserProfile[]>([]);
+  const [sortMode, setSortModeState] = useState<SortMode>("alphabetical");
+  const [customOrder, setCustomOrderState] = useState<string[]>([]);
+  const [launchCounts, setLaunchCountsState] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   async function loadProfiles() {
     setIsLoading(true);
     try {
-      const detected = await detectAllProfiles();
+      const [detected, savedSortMode, savedCustomOrder, savedLaunchCounts] = await Promise.all([
+        detectAllProfiles(),
+        getSortMode(),
+        getCustomProfileOrder(),
+        getProfileLaunchCounts(),
+      ]);
       setProfiles(detected);
+      setSortModeState(savedSortMode);
+      setCustomOrderState(savedCustomOrder);
+      setLaunchCountsState(savedLaunchCounts);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       await showToast({
@@ -81,6 +102,11 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   }, [searchQuery, preferences.defaultSearchEngine, preferences.customSearchUrl]);
 
   async function handleLaunch(profile: BrowserProfile, incognito = false) {
+    await recordProfileLaunch(profile.id);
+    setLaunchCountsState((prev) => ({
+      ...prev,
+      [profile.id]: (prev[profile.id] || 0) + 1,
+    }));
     await launchBrowserProfile(profile, targetUrl || undefined, incognito);
   }
 
@@ -102,7 +128,92 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     });
   }
 
-  // Filter profiles when in "filter" mode, or show all when in "query" mode (always sorted alphabetically)
+  function getSortModeLabel(mode: SortMode): string {
+    switch (mode) {
+      case "alphabetical":
+        return "Alphabetical (A → Z)";
+      case "reverse-alphabetical":
+        return "Reverse Alphabetical (Z → A)";
+      case "frequently-used":
+        return "Most Frequently Used";
+      case "custom":
+        return "Custom Order";
+      default:
+        return "Alphabetical";
+    }
+  }
+
+  async function handleSwitchSortMode(mode: SortMode) {
+    await setSortMode(mode);
+    setSortModeState(mode);
+    await showToast({
+      style: Toast.Style.Success,
+      title: `Sorted by ${getSortModeLabel(mode)}`,
+    });
+  }
+
+  function handleOrderChanged(newIds: string[]) {
+    setCustomOrderState(newIds);
+    setSortModeState("custom");
+  }
+
+  function getSortedProfilesForReorder(): BrowserProfile[] {
+    return [...profiles].sort((a, b) => {
+      const idxA = customOrder.indexOf(a.id);
+      const idxB = customOrder.indexOf(b.id);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
+      if (browserCmp !== 0) return browserCmp;
+      return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
+    });
+  }
+
+  async function handleQuickMove(profileId: string, direction: number) {
+    const currentList = getSortedProfilesForReorder();
+    const idx = currentList.findIndex((p) => p.id === profileId);
+    if (idx === -1) return;
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= currentList.length) return;
+
+    const next = [...currentList];
+    const temp = next[idx];
+    next[idx] = next[targetIdx];
+    next[targetIdx] = temp;
+
+    const newIds = next.map((p) => p.id);
+    await setCustomProfileOrder(newIds);
+    await setSortMode("custom");
+    setCustomOrderState(newIds);
+    setSortModeState("custom");
+    await showToast({
+      style: Toast.Style.Success,
+      title: `Moved ${temp.displayName} ${direction < 0 ? "up" : "down"} (#${targetIdx + 1})`,
+    });
+  }
+
+  async function handleQuickPinTop(profileId: string) {
+    const currentList = getSortedProfilesForReorder();
+    const idx = currentList.findIndex((p) => p.id === profileId);
+    if (idx <= 0) return;
+
+    const next = [...currentList];
+    const [target] = next.splice(idx, 1);
+    next.unshift(target);
+
+    const newIds = next.map((p) => p.id);
+    await setCustomProfileOrder(newIds);
+    await setSortMode("custom");
+    setCustomOrderState(newIds);
+    setSortModeState("custom");
+    await showToast({
+      style: Toast.Style.Success,
+      title: `Pinned ${target.displayName} to #1`,
+    });
+  }
+
+  // Filter profiles when in "filter" mode, or show all when in "query" mode (sorted according to sortMode)
   const displayedProfiles = useMemo(() => {
     const list =
       mode !== "filter" || !filterText.trim()
@@ -118,11 +229,38 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
           });
 
     return [...list].sort((a, b) => {
+      if (sortMode === "reverse-alphabetical") {
+        const browserCmp = b.browserName.localeCompare(a.browserName, undefined, { sensitivity: "base" });
+        if (browserCmp !== 0) return browserCmp;
+        return b.displayName.localeCompare(a.displayName, undefined, { sensitivity: "base" });
+      }
+
+      if (sortMode === "frequently-used") {
+        const countA = launchCounts[a.id] || 0;
+        const countB = launchCounts[b.id] || 0;
+        if (countB !== countA) return countB - countA;
+        const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
+        if (browserCmp !== 0) return browserCmp;
+        return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
+      }
+
+      if (sortMode === "custom") {
+        const idxA = customOrder.indexOf(a.id);
+        const idxB = customOrder.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
+        if (browserCmp !== 0) return browserCmp;
+        return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
+      }
+
+      // Default: "alphabetical"
       const browserCmp = a.browserName.localeCompare(b.browserName, undefined, { sensitivity: "base" });
       if (browserCmp !== 0) return browserCmp;
       return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" });
     });
-  }, [profiles, mode, filterText]);
+  }, [profiles, mode, filterText, sortMode, customOrder, launchCounts]);
 
   const favorites = useMemo(() => displayedProfiles.filter((p) => p.isFavorite), [displayedProfiles]);
   const allOther = useMemo(() => displayedProfiles.filter((p) => !p.isFavorite), [displayedProfiles]);
@@ -143,11 +281,21 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
 
   function renderProfileItem(profile: BrowserProfile) {
     const icon = getProfileIcon(profile);
-    const accessories: List.Item.Accessory[] = [
-      {
-        text: `Profile: ${profile.profileDirectory}`,
-      },
-    ];
+    const accessories: List.Item.Accessory[] = [];
+
+    if (sortMode === "custom") {
+      const rankIdx = customOrder.indexOf(profile.id);
+      if (rankIdx !== -1) {
+        accessories.push({ text: `#${rankIdx + 1}` });
+      }
+    } else if (sortMode === "frequently-used") {
+      const count = launchCounts[profile.id] || 0;
+      accessories.push({ text: `${count} launch${count === 1 ? "" : "es"}` });
+    }
+
+    accessories.push({
+      text: `Profile: ${profile.profileDirectory}`,
+    });
 
     return (
       <List.Item
@@ -169,6 +317,75 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 shortcut={{ modifiers: ["ctrl"], key: "enter" }}
                 onAction={() => handleLaunch(profile, true)}
               />
+            </ActionPanel.Section>
+
+            <ActionPanel.Section title="Profile Sorting & Arrangement">
+              <ActionPanel.Submenu
+                title={`Sort: ${getSortModeLabel(sortMode)}`}
+                icon={Icon.BarChart}
+                shortcut={Keyboard.Shortcut.Common.Save}
+              >
+                <Action
+                  title="Alphabetical (a → Z)"
+                  icon={sortMode === "alphabetical" ? Icon.Checkmark : Icon.Text}
+                  onAction={() => handleSwitchSortMode("alphabetical")}
+                />
+                <Action
+                  title="Reverse Alphabetical (Z → a)"
+                  icon={sortMode === "reverse-alphabetical" ? Icon.Checkmark : Icon.Text}
+                  onAction={() => handleSwitchSortMode("reverse-alphabetical")}
+                />
+                <Action
+                  title="Most Frequently Used (MRU)"
+                  icon={sortMode === "frequently-used" ? Icon.Checkmark : Icon.BarChart}
+                  onAction={() => handleSwitchSortMode("frequently-used")}
+                />
+                <Action.Push
+                  title="Custom Order (Reorder Profiles…)"
+                  icon={sortMode === "custom" ? Icon.Checkmark : Icon.List}
+                  target={
+                    <ReorderProfilesView
+                      initialProfiles={getSortedProfilesForReorder()}
+                      onOrderChanged={handleOrderChanged}
+                    />
+                  }
+                />
+              </ActionPanel.Submenu>
+
+              <Action.Push
+                title="Reorder Profiles Layout…"
+                icon={Icon.List}
+                shortcut={Keyboard.Shortcut.Common.OpenWith}
+                target={
+                  <ReorderProfilesView
+                    initialProfiles={getSortedProfilesForReorder()}
+                    onOrderChanged={handleOrderChanged}
+                  />
+                }
+              />
+
+              {sortMode === "custom" ? (
+                <>
+                  <Action
+                    title="Move up in Custom Order"
+                    icon={Icon.ArrowUp}
+                    shortcut={{ modifiers: ["opt"], key: "arrowUp" }}
+                    onAction={() => handleQuickMove(profile.id, -1)}
+                  />
+                  <Action
+                    title="Move Down in Custom Order"
+                    icon={Icon.ArrowDown}
+                    shortcut={{ modifiers: ["opt"], key: "arrowDown" }}
+                    onAction={() => handleQuickMove(profile.id, 1)}
+                  />
+                  <Action
+                    title="Pin to Top (#1) in Custom Order"
+                    icon={Icon.ArrowUpCircle}
+                    shortcut={Keyboard.Shortcut.Common.MoveUp}
+                    onAction={() => handleQuickPinTop(profile.id)}
+                  />
+                </>
+              ) : null}
             </ActionPanel.Section>
 
             <ActionPanel.Section title="Search & Filter Mode">
@@ -203,13 +420,13 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 onAction={() => handleToggleFavorite(profile.id)}
               />
               <Action.Push
-                title="Rename Display Name…"
+                title="Rename Display Name."
                 icon={Icon.Pencil}
                 shortcut={Keyboard.Shortcut.Common.Edit}
                 target={<RenameProfileForm profile={profile} onRenamed={loadProfiles} />}
               />
               <Action.Push
-                title="Add Custom Profile…"
+                title="Add Custom Profile."
                 icon={Icon.Plus}
                 shortcut={Keyboard.Shortcut.Common.New}
                 target={<AddCustomProfileForm onProfileAdded={loadProfiles} />}
@@ -306,7 +523,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
               onAction={() => setMode("query")}
             />
             <Action.Push
-              title="Add Custom Profile…"
+              title="Add Custom Profile."
               icon={Icon.Plus}
               target={<AddCustomProfileForm onProfileAdded={loadProfiles} />}
             />
