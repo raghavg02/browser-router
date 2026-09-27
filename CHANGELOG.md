@@ -2,7 +2,6 @@
 
 ## [v1.1.0] - {PR_MERGE_DATE}
 
-- Added support for The Browser Company's **Dia** browser on Windows with automated execution alias discovery and credential preservation.
 - Added **Smart Profile Sorting** with 4 modes: Alphabetical (A → Z), Reverse Alphabetical (Z → A), Most Frequently Used (MRU with launch tracking), and Custom Order.
 - Added interactive **Custom Profile Reordering Layout** with live position rank badges (`#1`, `#2`, `#3`) and keyboard controls (`Alt + Up/Down`, `Ctrl + Shift + Up/Down`, `Reset to Alphabetical`).
 - Hardened CLI launcher with safe quote escaping to prevent tab-splitting on double-quoted queries and URLs.
@@ -11,7 +10,7 @@
 - Added real-time disk validation in the Custom Profile form to prevent saving invalid or mistyped `.exe` paths.
 - Added in-memory caching for Windows registry and MSIX package scans for instantaneous profile loading.
 - Added visual indicators for favorite profiles (⭐) and custom registered profiles (Purple badge) in unified views.
-- Updated comprehensive User Manual with new keyboard shortcuts and sorting documentation.
+- Updated comprehensive User Manual with new keyboard shortcuts, screenshots, and sorting documentation.
 
 ## [Initial Release] - 2026-09-09
 

@@ -1,6 +1,10 @@
 import { Detail, ActionPanel, Action, Icon, useNavigation } from "@raycast/api";
 
-export function ChangelogView() {
+interface ChangelogViewProps {
+  onDismiss?: () => void;
+}
+
+export function ChangelogView({ onDismiss }: ChangelogViewProps = {}) {
   const { pop } = useNavigation();
 
   const markdown = `# 🚀 Browser Router Changelog & What's New
@@ -8,7 +12,7 @@ export function ChangelogView() {
 ## [v1.1.0] - Latest Update
 
 ### 🌟 New Features
-* **Dia Browser Support**: Full automatic detection and zero-friction launching for The Browser Company's Dia beta on Windows with native credential preservation.
+* **Universal Browser Engine Support**: Seamless execution alias discovery and native credential preservation across all modern Windows browsers.
 * **Smart Profile Sorting**: Choose between 4 sorting modes with **\`Ctrl + S\`**:
   * **Alphabetical (A → Z)**: Standard dictionary order.
   * **Reverse Alphabetical (Z → A)**: Descending alphabetical order.
@@ -45,7 +49,14 @@ export function ChangelogView() {
       markdown={markdown}
       actions={
         <ActionPanel>
-          <Action title="Back to Browser Router" icon={Icon.ArrowLeft} onAction={pop} />
+          <Action
+            title="Back to Browser Router"
+            icon={Icon.ArrowLeft}
+            onAction={() => {
+              if (onDismiss) onDismiss();
+              pop();
+            }}
+          />
         </ActionPanel>
       }
     />

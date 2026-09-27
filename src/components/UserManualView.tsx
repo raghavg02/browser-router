@@ -41,6 +41,7 @@ export function UserManualView({ onDismissFirstRun, isFirstRun = false }: UserMa
     const img4 = getScreenshotUri("04_action_panel.png");
     const img5 = getScreenshotUri("05_rename_profile.png");
     const img6 = getScreenshotUri("06_custom_profile.png");
+    const img7 = getScreenshotUri("07_profile_reorder.png");
 
     return `# 🧭 Browser Router — Complete User Manual & Guide
 
@@ -133,6 +134,8 @@ If you use portable browsers, developer builds (Canary, Developer Edition), or n
 
 Organize your browsers and profiles to match your daily workflow:
 
+![Custom Profile Reordering Layout](${img7})
+
 * **Quick Sort Submenu (\`Ctrl + S\`)**:
   * **Alphabetical (\`A → Z\`)**: Clean dictionary sorting by browser and profile names.
   * **Reverse Alphabetical (\`Z → A\`)**: Inverse alphabetical lookup.
@@ -182,7 +185,7 @@ Browser Router automatically detects and parses whatever you type:
 ## 🛡️ Authentic Profile Persistence on Windows
 
 Unlike basic URL openers that launch temporary guest sessions, Browser Router features **deep Windows profile detection**:
-* Detects genuine user data directories for **Google Chrome, Microsoft Edge, Brave, Dia, Vivaldi, Arc, Opera, and Mozilla Firefox**.
+* Detects genuine user data directories across all installed browsers (**Google Chrome, Microsoft Edge, Brave, Vivaldi, Arc, Opera, Mozilla Firefox**, and emerging modern browsers).
 * Preserves all logins, cookies, extensions, and bookmarks across sessions.
 * Seamlessly coordinates with already running browser windows without duplicate processes.
 

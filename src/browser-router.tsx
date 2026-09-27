@@ -51,6 +51,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
 
   const CURRENT_VERSION = "1.1.0";
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
+  const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
   useEffect(() => {
     async function checkFirstRunAndVersion() {
@@ -63,21 +64,22 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
         // First-run user: show User Manual, silently record current version
         await setLastSeenVersion(CURRENT_VERSION);
         setHasSeenManual(false);
+        setShowUpdateBanner(false);
       } else {
         setHasSeenManual(true);
         // Existing user: check if version has updated
         if (lastSeenVer !== CURRENT_VERSION) {
-          await setLastSeenVersion(CURRENT_VERSION);
-          await showToast({
-            style: Toast.Style.Success,
-            title: "Browser Router updated to v1.1!",
-            message: "New: Custom Profile Reordering & Dia Browser support",
-          });
+          setShowUpdateBanner(true);
         }
       }
     }
     checkFirstRunAndVersion();
   }, []);
+
+  async function handleDismissUpdateBanner() {
+    await setLastSeenVersion(CURRENT_VERSION);
+    setShowUpdateBanner(false);
+  }
 
   async function handleDismissFirstRun() {
     await LocalStorage.setItem("hasSeenUserManual", true);
@@ -420,7 +422,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 title="What's New (Changelog)"
                 icon={Icon.Stars}
                 shortcut={Keyboard.Shortcut.Common.Copy}
-                target={<ChangelogView />}
+                target={<ChangelogView onDismiss={handleDismissUpdateBanner} />}
               />
               <Action.Push
                 title="Send Feedback / Feature Request"
@@ -479,6 +481,34 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
         </List.Dropdown>
       }
     >
+      {showUpdateBanner && (mode === "query" ? !searchQuery.trim() : !filterText.trim()) ? (
+        <List.Section title="What's New in v1.1">
+          <List.Item
+            id="update-announcement-banner"
+            icon={{ source: Icon.Megaphone, tintColor: Color.Yellow }}
+            title="Browser Router v1.1 Update"
+            subtitle="Smart Profile Sorting, Reorder Layout & Performance Updates"
+            accessories={[{ text: "Press Enter to view changelog" }, { icon: Icon.ChevronRight }]}
+            actions={
+              <ActionPanel>
+                <Action.Push
+                  title="View What's New"
+                  icon={Icon.Eye}
+                  target={<ChangelogView onDismiss={handleDismissUpdateBanner} />}
+                  onPush={handleDismissUpdateBanner}
+                />
+                <Action
+                  title="Dismiss Announcement"
+                  icon={Icon.XMarkCircle}
+                  shortcut={Keyboard.Shortcut.Common.Remove}
+                  onAction={handleDismissUpdateBanner}
+                />
+              </ActionPanel>
+            }
+          />
+        </List.Section>
+      ) : null}
+
       <List.EmptyView
         icon={Icon.MagnifyingGlass}
         title="No Matching Profiles"
