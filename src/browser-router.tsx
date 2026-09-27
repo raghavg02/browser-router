@@ -500,14 +500,14 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
       }
     >
       {showUpdateBanner ? (
-        <List.Section title="Announcement">
+        <List.Section title="What's New">
           <List.Item
             id="update-announcement-banner"
             icon={{ source: Icon.Stars, tintColor: Color.Purple }}
-            title="What's New in v1.1"
-            subtitle="Custom profile reordering, smart sorting & speed improvements"
+            title="Browser Router Updated"
+            subtitle="Custom profile reordering, smart sorting & performance"
             accessories={[
-              { tag: { value: "v1.1", color: Color.Purple } },
+              { tag: { value: "v1.1", color: Color.Green } },
               { text: "Changelog", icon: Icon.ChevronRight },
             ]}
             actions={
