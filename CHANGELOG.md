@@ -12,7 +12,7 @@
 - Added visual indicators for favorite profiles (⭐) and custom registered profiles (Purple badge) in unified views.
 - Updated comprehensive User Manual with new keyboard shortcuts, screenshots, and sorting documentation.
 
-## [Initial Release] - 2026-09-09
+## [Initial Release] - 2026-09-25
 
 - Initial release of Browser Router for Windows.
 - Route search queries and URLs directly from Raycast to any installed browser and profile.
