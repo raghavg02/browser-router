@@ -26,7 +26,6 @@ import {
   getCustomProfileOrder,
   getProfileLaunchCounts,
   recordProfileLaunch,
-  getLastSeenVersion,
   setLastSeenVersion,
 } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
@@ -49,26 +48,27 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
   const [filterText, setFilterText] = useState<string>("");
 
-  const CURRENT_VERSION = "1.1.0";
+  const CURRENT_VERSION = "1.1";
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
   useEffect(() => {
     async function checkFirstRunAndVersion() {
-      const [seenManual, lastSeenVer] = await Promise.all([
+      const [seenManual, dismissed] = await Promise.all([
         LocalStorage.getItem<boolean>("hasSeenUserManual"),
-        getLastSeenVersion(),
+        LocalStorage.getItem<boolean>(`browser_router_dismissed_announcement_${CURRENT_VERSION}`),
       ]);
 
       if (!seenManual) {
-        // First-run user: show User Manual, silently record current version
+        // First-run user: show User Manual, silently mark announcement dismissed so they do not see duplicate intro
+        await LocalStorage.setItem(`browser_router_dismissed_announcement_${CURRENT_VERSION}`, true);
         await setLastSeenVersion(CURRENT_VERSION);
         setHasSeenManual(false);
         setShowUpdateBanner(false);
       } else {
         setHasSeenManual(true);
-        // Existing user: check if version has updated
-        if (lastSeenVer !== CURRENT_VERSION) {
+        // Existing user: show update banner if not dismissed yet
+        if (!dismissed) {
           setShowUpdateBanner(true);
         }
       }
@@ -77,6 +77,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   }, []);
 
   async function handleDismissUpdateBanner() {
+    await LocalStorage.setItem(`browser_router_dismissed_announcement_${CURRENT_VERSION}`, true);
     await setLastSeenVersion(CURRENT_VERSION);
     setShowUpdateBanner(false);
   }
@@ -481,7 +482,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
         </List.Dropdown>
       }
     >
-      {showUpdateBanner && (mode === "query" ? !searchQuery.trim() : !filterText.trim()) ? (
+      {showUpdateBanner ? (
         <List.Section title="What's New in v1.1">
           <List.Item
             id="update-announcement-banner"

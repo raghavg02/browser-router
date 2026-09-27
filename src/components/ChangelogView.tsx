@@ -9,7 +9,7 @@ export function ChangelogView({ onDismiss }: ChangelogViewProps = {}) {
 
   const markdown = `# 🚀 Browser Router Changelog & What's New
 
-## [v1.1.0] - Latest Update
+## [v1.1] - Latest Update
 
 ### 🌟 New Features
 * **Universal Browser Engine Support**: Seamless execution alias discovery and native credential preservation across all modern Windows browsers.
