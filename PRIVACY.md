@@ -11,7 +11,7 @@ Browser Router is engineered with an absolute **privacy-first architecture**. We
 - **Zero Telemetry**: Browser Router collects **no** telemetry, usage metrics, analytics, or behavioral data.
 - **100% Local Execution**: All profile detection, registry inspection, query routing, and browser launching occur entirely on your local Windows machine.
 - **No Access to Sensitive Data**: Browser Router **never** reads or accesses your browsing history, saved passwords, authentication cookies, form autofill, or personal downloads.
-- **Optional Opt-In Feedback**: The only time network traffic is generated is when you explicitly submit a feedback or bug report through the in-app form (<kbd>Ctrl</kbd> + <kbd>F</kbd>).
+- **Optional Opt-In Feedback**: The only time network traffic is generated is when you explicitly submit a feedback or bug report through the in-app form (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>).
 
 ---
 
@@ -20,9 +20,9 @@ Browser Router is engineered with an absolute **privacy-first architecture**. We
 To provide profile-aware browser routing, Browser Router inspects standard Windows registry paths and browser configuration files:
 
 1. **Windows Registry**:
-   - Queries HKCU\Software\Clients\StartMenuInternet and HKLM\Software\Clients\StartMenuInternet to locate installed browser binary paths (chrome.exe, msedge.exe, rave.exe, ivaldi.exe, etc.).
+   - Queries HKCU\Software\Clients\StartMenuInternet and HKLM\Software\Clients\StartMenuInternet to locate installed browser binary paths (chrome.exe, msedge.exe, brave.exe, vivaldi.exe, etc.).
 2. **Profile Metadata**:
-   - Reads the Local State (JSON) and individual profile Preferences files located in standard application data directories (%LOCALAPPDATA%).
+   - Reads the Local State (JSON) file and profile avatar assets located in standard application data directories (%LOCALAPPDATA%).
    - Extracts only non-sensitive visual metadata:
      - Profile folder directory names (e.g., Default, Profile 1)
      - Profile display names (e.g., "Work", "Personal")
@@ -85,4 +85,4 @@ Browser Router is completely open source under the permissive [MIT License](LICE
 
 If you have questions, feedback, or security inquiries:
 - **GitHub Issues**: Open an issue or discussion on the official GitHub repository.
-- **In-App Feedback**: Use the built-in feedback tool (<kbd>Ctrl</kbd> + <kbd>F</kbd>).
+- **In-App Feedback**: Use the built-in feedback tool (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F</kbd>).
