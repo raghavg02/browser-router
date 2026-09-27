@@ -110,7 +110,10 @@ function cleanRegistryCmd(cmd: string): string {
   return match ? match[1] : cmd.replace(/"/g, "").trim();
 }
 
+let cachedRegistryBrowsers: Map<string, string> | null = null;
+
 function getBrowsersFromRegistry(): Map<string, string> {
+  if (cachedRegistryBrowsers) return cachedRegistryBrowsers;
   const map = new Map<string, string>();
   if (process.platform !== "win32") return map;
 
@@ -155,10 +158,19 @@ function getBrowsersFromRegistry(): Map<string, string> {
     }
   }
 
+  cachedRegistryBrowsers = map;
   return map;
 }
 
+let cachedPackagedBrowsers: ChromiumBrowserDef[] | null = null;
+
 function detectDynamicPackagedBrowsers(localAppData: string, knownIds: Set<string>): ChromiumBrowserDef[] {
+  if (cachedPackagedBrowsers) {
+    for (const b of cachedPackagedBrowsers) {
+      knownIds.add(b.id);
+    }
+    return cachedPackagedBrowsers;
+  }
   const discovered: ChromiumBrowserDef[] = [];
   const packagesDir = path.join(localAppData, "Packages");
   if (!fs.existsSync(packagesDir)) return discovered;
@@ -215,6 +227,7 @@ function detectDynamicPackagedBrowsers(localAppData: string, knownIds: Set<strin
     // ignore
   }
 
+  cachedPackagedBrowsers = discovered;
   return discovered;
 }
 

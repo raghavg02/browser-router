@@ -11,6 +11,7 @@ import {
   Keyboard,
   openExtensionPreferences,
   LocalStorage,
+  Color,
 } from "@raycast/api";
 import { useEffect, useState, useMemo } from "react";
 import { BrowserProfile, SortMode } from "./types";
@@ -238,6 +239,19 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   function renderProfileItem(profile: BrowserProfile) {
     const icon = getProfileIcon(profile);
     const accessories: List.Item.Accessory[] = [];
+
+    if (profile.isFavorite) {
+      accessories.push({
+        icon: { source: Icon.Star, tintColor: Color.Yellow },
+        tooltip: "Favorite Profile",
+      });
+    }
+
+    if (profile.isCustom) {
+      accessories.push({
+        tag: { value: "Custom", color: Color.Purple },
+      });
+    }
 
     if (sortMode === "custom") {
       const rankIdx = customOrder.indexOf(profile.id);
@@ -468,9 +482,13 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
         }
       />
 
-      {favorites.length > 0 ? <List.Section title="Favorites">{favorites.map(renderProfileItem)}</List.Section> : null}
+      {sortMode !== "custom" && favorites.length > 0 ? (
+        <List.Section title="Favorites">{favorites.map(renderProfileItem)}</List.Section>
+      ) : null}
 
-      <List.Section title={sectionTitle}>{allOther.map(renderProfileItem)}</List.Section>
+      <List.Section title={sectionTitle}>
+        {sortMode === "custom" ? displayedProfiles.map(renderProfileItem) : allOther.map(renderProfileItem)}
+      </List.Section>
     </List>
   );
 }

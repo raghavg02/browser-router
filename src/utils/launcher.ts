@@ -92,8 +92,19 @@ function getCleanBrowserEnv(): NodeJS.ProcessEnv {
   return cleanEnv;
 }
 
+function formatShellArg(arg: string): string {
+  if (arg.startsWith('"') && arg.endsWith('"') && arg.length >= 2) {
+    return arg;
+  }
+  const escaped = arg.split('"').join('\\"');
+  if (escaped.includes(" ") || escaped.includes('"')) {
+    return `"${escaped}"`;
+  }
+  return escaped;
+}
+
 function launchViaExplorerShell(executablePath: string, args: string[], cwd?: string): Promise<boolean> {
-  const formattedArgs = args.map((a) => (a.includes(" ") && !a.startsWith('"') ? `"${a}"` : a));
+  const formattedArgs = args.map(formatShellArg);
   const argsString = formattedArgs.join(" ");
 
   // Delegates process creation directly to explorer.exe (Windows Desktop Shell).
@@ -133,7 +144,7 @@ function launchViaExplorerShell(executablePath: string, args: string[], cwd?: st
 
   return new Promise((resolve) => {
     try {
-      const child = spawn("cscript.exe", ["//nologo", "//E:jscript", tempScript], {
+      const child = spawn("cscript.exe", ["//nologo", "//B", "//E:jscript", tempScript], {
         windowsHide: true,
         stdio: "ignore",
       });
