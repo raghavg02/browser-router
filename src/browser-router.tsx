@@ -12,7 +12,6 @@ import {
   openExtensionPreferences,
   LocalStorage,
   Color,
-  environment,
 } from "@raycast/api";
 import { useEffect, useState, useMemo } from "react";
 import { BrowserProfile, SortMode } from "./types";
@@ -85,16 +84,6 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     await showToast({
       style: Toast.Style.Success,
       title: "Announcement Dismissed",
-    });
-  }
-
-  async function handleResetUpdateBanner() {
-    await LocalStorage.removeItem(ANNOUNCEMENT_STORAGE_KEY);
-    setShowUpdateBanner(true);
-    await showToast({
-      style: Toast.Style.Success,
-      title: "Announcement Banner Restored",
-      message: "Banner is visible at the top for testing",
     });
   }
 
@@ -447,14 +436,6 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
                 target={<FeedbackForm />}
               />
-              {environment.isDevelopment && (
-                <Action
-                  title="Show Announcement Banner (Testing)"
-                  icon={Icon.Stars}
-                  shortcut={{ modifiers: ["ctrl", "shift"], key: "u" }}
-                  onAction={handleResetUpdateBanner}
-                />
-              )}
             </ActionPanel.Section>
 
             <ActionPanel.Section>
