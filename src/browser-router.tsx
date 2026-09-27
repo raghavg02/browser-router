@@ -12,6 +12,7 @@ import {
   openExtensionPreferences,
   LocalStorage,
   Color,
+  environment,
 } from "@raycast/api";
 import { useEffect, useState, useMemo } from "react";
 import { BrowserProfile, SortMode } from "./types";
@@ -446,12 +447,14 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
                 target={<FeedbackForm />}
               />
-              <Action
-                title="Show Announcement Banner (Testing)"
-                icon={Icon.Stars}
-                shortcut={{ modifiers: ["ctrl", "shift"], key: "u" }}
-                onAction={handleResetUpdateBanner}
-              />
+              {environment.isDevelopment && (
+                <Action
+                  title="Show Announcement Banner (Testing)"
+                  icon={Icon.Stars}
+                  shortcut={{ modifiers: ["ctrl", "shift"], key: "u" }}
+                  onAction={handleResetUpdateBanner}
+                />
+              )}
             </ActionPanel.Section>
 
             <ActionPanel.Section>
