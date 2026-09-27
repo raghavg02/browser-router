@@ -1,6 +1,19 @@
 # Browser Router Changelog
 
-## [Initial Release] - {PR_MERGE_DATE}
+## [v2.0.0] - {PR_MERGE_DATE}
+
+- Added support for The Browser Company's **Dia** browser on Windows with automated execution alias discovery and credential preservation.
+- Added **Smart Profile Sorting** with 4 modes: Alphabetical (A → Z), Reverse Alphabetical (Z → A), Most Frequently Used (MRU with launch tracking), and Custom Order.
+- Added interactive **Custom Profile Reordering Layout** with live position rank badges (`#1`, `#2`, `#3`) and keyboard controls (`Alt + Up/Down`, `Ctrl + Shift + Up/Down`, `Reset to Alphabetical`).
+- Hardened CLI launcher with safe quote escaping to prevent tab-splitting on double-quoted queries and URLs.
+- Enhanced URL resolution to intelligently differentiate programming keywords (e.g. `react.js`, `node.js`, `vue.js`) from web domains.
+- Added strict IPv4 0-255 octet range validation.
+- Added real-time disk validation in the Custom Profile form to prevent saving invalid or mistyped `.exe` paths.
+- Added in-memory caching for Windows registry and MSIX package scans for instantaneous profile loading.
+- Added visual indicators for favorite profiles (⭐) and custom registered profiles (Purple badge) in unified views.
+- Updated comprehensive User Manual with new keyboard shortcuts and sorting documentation.
+
+## [Initial Release] - 2026-09-09
 
 - Initial release of Browser Router for Windows.
 - Route search queries and URLs directly from Raycast to any installed browser and profile.

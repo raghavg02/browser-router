@@ -118,3 +118,14 @@ export async function recordProfileLaunch(profileId: string): Promise<void> {
   counts[profileId] = (counts[profileId] || 0) + 1;
   await LocalStorage.setItem(LAUNCH_COUNTS_KEY, JSON.stringify(counts));
 }
+
+const LAST_SEEN_VERSION_KEY = "browser_router_last_seen_version";
+
+export async function getLastSeenVersion(): Promise<string | undefined> {
+  const data = await LocalStorage.getItem<string>(LAST_SEEN_VERSION_KEY);
+  return data || undefined;
+}
+
+export async function setLastSeenVersion(version: string): Promise<void> {
+  await LocalStorage.setItem(LAST_SEEN_VERSION_KEY, version);
+}

@@ -26,11 +26,14 @@ import {
   getCustomProfileOrder,
   getProfileLaunchCounts,
   recordProfileLaunch,
+  getLastSeenVersion,
+  setLastSeenVersion,
 } from "./utils/storage";
 import { AddCustomProfileForm } from "./components/AddCustomProfileForm";
 import { RenameProfileForm } from "./components/RenameProfileForm";
 import { FeedbackForm } from "./components/FeedbackForm";
 import { UserManualView } from "./components/UserManualView";
+import { ChangelogView } from "./components/ChangelogView";
 import { ReorderProfilesView } from "./components/ReorderProfilesView";
 
 export default function Command(props: LaunchProps<{ arguments: Arguments.BrowserRouter; fallbackText?: string }>) {
@@ -46,14 +49,34 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   const [searchQuery, setSearchQuery] = useState<string>(initialQuery);
   const [filterText, setFilterText] = useState<string>("");
 
+  const CURRENT_VERSION = "2.0.0";
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
 
   useEffect(() => {
-    async function checkFirstRun() {
-      const seen = await LocalStorage.getItem<boolean>("hasSeenUserManual");
-      setHasSeenManual(!!seen);
+    async function checkFirstRunAndVersion() {
+      const [seenManual, lastSeenVer] = await Promise.all([
+        LocalStorage.getItem<boolean>("hasSeenUserManual"),
+        getLastSeenVersion(),
+      ]);
+
+      if (!seenManual) {
+        // First-run user: show User Manual, silently record current version
+        await setLastSeenVersion(CURRENT_VERSION);
+        setHasSeenManual(false);
+      } else {
+        setHasSeenManual(true);
+        // Existing user: check if version has updated
+        if (lastSeenVer !== CURRENT_VERSION) {
+          await setLastSeenVersion(CURRENT_VERSION);
+          await showToast({
+            style: Toast.Style.Success,
+            title: "Browser Router updated to v2.0!",
+            message: "New: Custom Profile Reordering & Dia Browser support",
+          });
+        }
+      }
     }
-    checkFirstRun();
+    checkFirstRunAndVersion();
   }, []);
 
   async function handleDismissFirstRun() {
@@ -392,6 +415,12 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 icon={Icon.Book}
                 shortcut={{ modifiers: ["ctrl"], key: "h" }}
                 target={<UserManualView />}
+              />
+              <Action.Push
+                title="What's New (Changelog)"
+                icon={Icon.Stars}
+                shortcut={Keyboard.Shortcut.Common.Copy}
+                target={<ChangelogView />}
               />
               <Action.Push
                 title="Send Feedback / Feature Request"
