@@ -23,7 +23,6 @@ import {
   getSortMode,
   setSortMode,
   getCustomProfileOrder,
-  setCustomProfileOrder,
   getProfileLaunchCounts,
   recordProfileLaunch,
 } from "./utils/storage";
@@ -170,49 +169,6 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     });
   }
 
-  async function handleQuickMove(profileId: string, direction: number) {
-    const currentList = getSortedProfilesForReorder();
-    const idx = currentList.findIndex((p) => p.id === profileId);
-    if (idx === -1) return;
-    const targetIdx = idx + direction;
-    if (targetIdx < 0 || targetIdx >= currentList.length) return;
-
-    const next = [...currentList];
-    const temp = next[idx];
-    next[idx] = next[targetIdx];
-    next[targetIdx] = temp;
-
-    const newIds = next.map((p) => p.id);
-    await setCustomProfileOrder(newIds);
-    await setSortMode("custom");
-    setCustomOrderState(newIds);
-    setSortModeState("custom");
-    await showToast({
-      style: Toast.Style.Success,
-      title: `Moved ${temp.displayName} ${direction < 0 ? "up" : "down"} (#${targetIdx + 1})`,
-    });
-  }
-
-  async function handleQuickPinTop(profileId: string) {
-    const currentList = getSortedProfilesForReorder();
-    const idx = currentList.findIndex((p) => p.id === profileId);
-    if (idx <= 0) return;
-
-    const next = [...currentList];
-    const [target] = next.splice(idx, 1);
-    next.unshift(target);
-
-    const newIds = next.map((p) => p.id);
-    await setCustomProfileOrder(newIds);
-    await setSortMode("custom");
-    setCustomOrderState(newIds);
-    setSortModeState("custom");
-    await showToast({
-      style: Toast.Style.Success,
-      title: `Pinned ${target.displayName} to #1`,
-    });
-  }
-
   // Filter profiles when in "filter" mode, or show all when in "query" mode (sorted according to sortMode)
   const displayedProfiles = useMemo(() => {
     const list =
@@ -340,9 +296,18 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                   icon={sortMode === "frequently-used" ? Icon.Checkmark : Icon.BarChart}
                   onAction={() => handleSwitchSortMode("frequently-used")}
                 />
-                <Action.Push
-                  title="Custom Order (Reorder Profiles…)"
+                <Action
+                  title="Custom Order"
                   icon={sortMode === "custom" ? Icon.Checkmark : Icon.List}
+                  onAction={() => handleSwitchSortMode("custom")}
+                />
+              </ActionPanel.Submenu>
+
+              {sortMode === "custom" ? (
+                <Action.Push
+                  title="Reorder Profiles Layout…"
+                  icon={Icon.List}
+                  shortcut={Keyboard.Shortcut.Common.OpenWith}
                   target={
                     <ReorderProfilesView
                       initialProfiles={getSortedProfilesForReorder()}
@@ -350,41 +315,6 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                     />
                   }
                 />
-              </ActionPanel.Submenu>
-
-              <Action.Push
-                title="Reorder Profiles Layout…"
-                icon={Icon.List}
-                shortcut={Keyboard.Shortcut.Common.OpenWith}
-                target={
-                  <ReorderProfilesView
-                    initialProfiles={getSortedProfilesForReorder()}
-                    onOrderChanged={handleOrderChanged}
-                  />
-                }
-              />
-
-              {sortMode === "custom" ? (
-                <>
-                  <Action
-                    title="Move up in Custom Order"
-                    icon={Icon.ArrowUp}
-                    shortcut={{ modifiers: ["opt"], key: "arrowUp" }}
-                    onAction={() => handleQuickMove(profile.id, -1)}
-                  />
-                  <Action
-                    title="Move Down in Custom Order"
-                    icon={Icon.ArrowDown}
-                    shortcut={{ modifiers: ["opt"], key: "arrowDown" }}
-                    onAction={() => handleQuickMove(profile.id, 1)}
-                  />
-                  <Action
-                    title="Pin to Top (#1) in Custom Order"
-                    icon={Icon.ArrowUpCircle}
-                    shortcut={Keyboard.Shortcut.Common.MoveUp}
-                    onAction={() => handleQuickPinTop(profile.id)}
-                  />
-                </>
               ) : null}
             </ActionPanel.Section>
 
