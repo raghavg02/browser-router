@@ -49,6 +49,7 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   const [filterText, setFilterText] = useState<string>("");
 
   const CURRENT_VERSION = "1.1";
+  const ANNOUNCEMENT_STORAGE_KEY = `browser_router_announcement_${CURRENT_VERSION}_dismissed`;
   const [hasSeenManual, setHasSeenManual] = useState<boolean | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(false);
 
@@ -56,12 +57,12 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
     async function checkFirstRunAndVersion() {
       const [seenManual, dismissed] = await Promise.all([
         LocalStorage.getItem<boolean>("hasSeenUserManual"),
-        LocalStorage.getItem<boolean>(`browser_router_dismissed_announcement_${CURRENT_VERSION}`),
+        LocalStorage.getItem<boolean>(ANNOUNCEMENT_STORAGE_KEY),
       ]);
 
       if (!seenManual) {
         // First-run user: show User Manual, silently mark announcement dismissed so they do not see duplicate intro
-        await LocalStorage.setItem(`browser_router_dismissed_announcement_${CURRENT_VERSION}`, true);
+        await LocalStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, true);
         await setLastSeenVersion(CURRENT_VERSION);
         setHasSeenManual(false);
         setShowUpdateBanner(false);
@@ -77,9 +78,19 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
   }, []);
 
   async function handleDismissUpdateBanner() {
-    await LocalStorage.setItem(`browser_router_dismissed_announcement_${CURRENT_VERSION}`, true);
+    await LocalStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, true);
     await setLastSeenVersion(CURRENT_VERSION);
     setShowUpdateBanner(false);
+  }
+
+  async function handleResetUpdateBanner() {
+    await LocalStorage.removeItem(ANNOUNCEMENT_STORAGE_KEY);
+    setShowUpdateBanner(true);
+    await showToast({
+      style: Toast.Style.Success,
+      title: "Announcement Banner Restored",
+      message: "Banner is visible at the top for testing",
+    });
   }
 
   async function handleDismissFirstRun() {
@@ -430,6 +441,12 @@ export default function Command(props: LaunchProps<{ arguments: Arguments.Browse
                 icon={Icon.Envelope}
                 shortcut={{ modifiers: ["ctrl", "shift"], key: "f" }}
                 target={<FeedbackForm />}
+              />
+              <Action
+                title="Show Announcement Banner (Testing)"
+                icon={Icon.Stars}
+                shortcut={{ modifiers: ["ctrl", "shift"], key: "u" }}
+                onAction={handleResetUpdateBanner}
               />
             </ActionPanel.Section>
 
